@@ -17,4 +17,4 @@ EXPOSE 8000
 # You can set DEBUG to False in a production environment
 ENV DEBUG=True
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "echosight.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "EchoSight_BackEnd.wsgi:application"]
