@@ -10,4 +10,11 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-CMD [ "python", "manage.py", "runserver", "0.0.0.0:8000" ]
+# Make port 8000 available to the world outside this container
+EXPOSE 8000
+
+# Define environment variable
+# You can set DEBUG to False in a production environment
+ENV DEBUG=True
+
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "echosight.wsgi:application"]
