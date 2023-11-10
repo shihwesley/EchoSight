@@ -18,7 +18,7 @@ from rest_framework.views import APIView
 from .models import Image
 from .serializers import ImageSerializer
 
-client = OpenAI(api_key='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')
+client = OpenAI(api_key='')
 
 def encode_image(image_file, size):
     # Open the image file with PIL
@@ -106,7 +106,6 @@ class ImageUploadView(APIView):
         params = {
             "model": "gpt-4-vision-preview",
             "messages": PROMPT_MESSAGES,
-            #"api_key": "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",
             "max_tokens": 300,
         }
 
