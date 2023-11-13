@@ -18,7 +18,7 @@ from rest_framework.views import APIView
 from .models import Image
 from .serializers import ImageSerializer
 
-client = OpenAI(api_key='')
+client = OpenAI(api_key='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')
 
 def encode_image(image_file, size):
     # Open the image file with PIL
