@@ -69,7 +69,7 @@ jobs:
     - name: Build, tag, and push image to Amazon ECR
       id: build-image
       env:
-        REGISTRY: ${{ steps.login-ecr-public.outputs.registry }}
+        REGISTRY: public.ecr.aws
         REGISTRY_ALIAS: p0b0h1i7
         REPOSITORY: echosight
         IMAGE_TAG: ${{ github.sha }}
