@@ -18,7 +18,32 @@ from rest_framework.views import APIView
 from .models import Image
 from .serializers import ImageSerializer
 
-client = OpenAI(api_key='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')
+# def get_secret():
+
+#     secret_name = "OPENAI_API_KEY"
+#     region_name = "us-east-1"
+
+#     # Create a Secrets Manager client
+#     session = boto3.session.Session()
+#     client = session.client(
+#         service_name='secretsmanager',
+#         region_name=region_name
+#     )
+
+#     try:
+#         get_secret_value_response = client.get_secret_value(
+#             SecretId=secret_name
+#         )
+#     except ClientError as e:
+#         # For a list of exceptions thrown, see
+#         # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+#         raise e
+
+#     # Decrypts secret using the associated KMS key.
+#     secret = get_secret_value_response['SecretString']
+
+openai_api_key = os.environ.get('OPENAI_API_KEY')
+client = OpenAI(api_key= openai_api_key)
 
 def encode_image(image_file, size):
     # Open the image file with PIL

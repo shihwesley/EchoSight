@@ -1,5 +1,5 @@
 {
-    "taskDefinitionArn": "arn:aws:ecs:us-east-1:690626078970:task-definition/EchoSight:1",
+    "taskDefinitionArn": "arn:aws:ecs:us-east-1:690626078970:task-definition/EchoSight:3",
     "containerDefinitions": [
         {
             "name": "EchoSight",
@@ -15,11 +15,20 @@
                 }
             ],
             "essential": true,
-            "environment": [],
-            "environmentFiles": [],
+            "environment": [
+                {
+                    "name": "LOG_LEVEL",
+                    "value": "info"
+                }
+            ],
             "mountPoints": [],
             "volumesFrom": [],
-            "ulimits": [],
+            "secrets": [
+                {
+                    "name": "OPENAI_API_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:region:account-id:secret:OPENAI_API_KEY"
+                }
+            ],
             "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
@@ -27,15 +36,14 @@
                     "awslogs-group": "/ecs/EchoSight",
                     "awslogs-region": "us-east-1",
                     "awslogs-stream-prefix": "ecs"
-                },
-                "secretOptions": []
+                }
             }
         }
     ],
     "family": "EchoSight",
     "executionRoleArn": "arn:aws:iam::690626078970:role/ecsTaskExecutionRole",
     "networkMode": "awsvpc",
-    "revision": 1,
+    "revision": 3,
     "volumes": [],
     "status": "ACTIVE",
     "requiresAttributes": [
@@ -47,6 +55,9 @@
         },
         {
             "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+        },
+        {
+            "name": "ecs.capability.secrets.asm.environment-variables"
         },
         {
             "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
@@ -72,7 +83,7 @@
         "cpuArchitecture": "ARM64",
         "operatingSystemFamily": "LINUX"
     },
-    "registeredAt": "2023-11-13T20:53:12.049Z",
+    "registeredAt": "2023-11-14T22:06:08.647Z",
     "registeredBy": "arn:aws:iam::690626078970:root",
     "tags": []
 }
