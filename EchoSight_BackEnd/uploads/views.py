@@ -5,7 +5,7 @@ import time
 
 #import cv2  # We're using OpenCV to read video
 import requests
-from django.http import StreamingHttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from IPython.display import Audio, Image, display
 from openai import OpenAI
 from PIL import \
@@ -17,6 +17,9 @@ from rest_framework.views import APIView
 
 from .models import Image
 from .serializers import ImageSerializer
+
+def health_check(request):
+    return HttpResponse("OK")
 
 # def get_secret():
 
