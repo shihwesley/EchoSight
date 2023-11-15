@@ -54,3 +54,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 });
+
+// function triggerAnimation() {
+//     let uploadBtn = document.getElementById('upload-btn');
+//     uploadBtn.classList.add('animate');
+//     setTimeout(() => uploadBtn.classList.remove('animate'), 1000); // Animation lasts 1 second
+// }
+
+
+

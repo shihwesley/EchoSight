@@ -29,8 +29,8 @@ name: Deploy to Amazon ECS
 on:
   push:
     branches: ["main"]
-    paths: 
-        - 'EchoSight_BackEnd/**'
+    #paths: 
+    #    - 'EchoSight_BackEnd/**'
   
 
 env:
@@ -88,13 +88,11 @@ jobs:
         with:
           task-definition: EchoSight-taskdefinition.json
           container-name: EchoSight
-          image: public.ecr.aws/p0b0h1i7/echosight:latest
+          image: public.ecr.aws/p0b0h1i7/echosight:${{ github.sha }}
           environment-variables: "LOG_LEVEL=info"
 
       - name: Deploy to Amazon ECS service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        run: |
-          echo "${{ steps.render-web-container.outputs.task-definition }}" >> $GITHUB_OUTPUT
         with:
           task-definition: ${{ steps.render-web-container.outputs.task-definition }}
           service: EchoSight-Services 
