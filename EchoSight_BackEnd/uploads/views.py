@@ -2,6 +2,7 @@ import base64
 import io
 import os
 import time
+import logging
 
 #import cv2  # We're using OpenCV to read video
 import requests
@@ -17,6 +18,11 @@ from rest_framework.views import APIView
 
 from .models import Image
 from .serializers import ImageSerializer
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
 
 def health_check(request):
     return HttpResponse("OK")
@@ -49,6 +55,7 @@ openai_api_key = os.environ.get('OPENAI_API_KEY')
 client = OpenAI(api_key= openai_api_key)
 
 def encode_image(image_file, size):
+    logger.info('encode_image')
     # Open the image file with PIL
     img = PilImage.open(image_file)
 
@@ -74,7 +81,7 @@ def encode_image(image_file, size):
 
 def get_audio_stream(description_text):
     try:
-        print('world')
+        logger.info('get_audio_stream')
         response = client.audio.speech.create(
             model="tts-1",
             voice="alloy",
@@ -97,7 +104,7 @@ class ImageUploadView(APIView):
     parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request, *args, **kwargs):
-        print('hello')
+        logger.info('Received a new request for image upload')
         data = {'image': request.data.get('photo')}
         # Create a new dictionary with 'image' key
         image_file = data.get("image")
