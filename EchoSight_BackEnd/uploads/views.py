@@ -137,6 +137,7 @@ class ImageUploadView(APIView):
         result = client.chat.completions.create(**params)
         #print(result.choices[0].message.content)
         description_text = result.choices[0].message.content
+        print(description_text)
         # Convert the description text to audio
         audio_stream = get_audio_stream(description_text)
         # Convert audio_stream to a format that can be sent in the response

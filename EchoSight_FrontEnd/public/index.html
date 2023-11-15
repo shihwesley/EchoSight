@@ -1,6 +1,40 @@
 <!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EchoSight Web App</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <video autoplay muted loop id="background-video">
+        <source src="Audio2.mp4" type="video/mp4">
+        Your browser does not support HTML5 video.
+    </video>
+    <div class="logo-container">
+        <img src="logo.png" alt="EchoSight Logo"> <!-- Logo Image -->
+    </div>
+    <div class="main-container">
+        <h1>EchoSight Photo Upload</h1>
+        <input type="file" accept="image/*" id="photo-input" capture="camera" aria-label="Select a photo">
+        <button id="upload-btn" >Upload Photo</button>
+    </div>
+    <script src="../src/App.js"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+<!-- <!DOCTYPE html>
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -15,4 +49,11 @@
     <script src="app.js"></script>
 </body>
 
-</html>
+</html> -->
+
+
+
+
+
+
+
