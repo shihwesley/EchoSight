@@ -15,7 +15,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-from . import views  # Import views from the project level
+from uploads import views
 
 
 
