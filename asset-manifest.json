@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/EchoSight/static/js/main.3b3bdfc7.js",
+    "main.js": "/EchoSight/static/js/main.b49bb4d4.js",
     "index.html": "/EchoSight/index.html",
-    "main.3b3bdfc7.js.map": "/EchoSight/static/js/main.3b3bdfc7.js.map"
+    "main.b49bb4d4.js.map": "/EchoSight/static/js/main.b49bb4d4.js.map"
   },
   "entrypoints": [
-    "static/js/main.3b3bdfc7.js"
+    "static/js/main.b49bb4d4.js"
   ]
 }
