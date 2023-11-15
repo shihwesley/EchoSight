@@ -3,7 +3,7 @@
     "containerDefinitions": [
         {
             "name": "EchoSight",
-            "image": "public.ecr.aws/p0b0h1i7/echosight:latest",
+            "image": "public.ecr.aws/p0b0h1i7/echosight:${{ github.sha }}",
             "cpu": 0,
             "portMappings": [
                 {
