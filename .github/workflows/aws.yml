@@ -93,8 +93,6 @@ jobs:
 
       - name: Deploy to Amazon ECS service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        run: |
-          echo "${{ steps.render-web-container.outputs.task-definition }}" >> $GITHUB_OUTPUT
         with:
           task-definition: ${{ steps.render-web-container.outputs.task-definition }}
           service: EchoSight-Services 
