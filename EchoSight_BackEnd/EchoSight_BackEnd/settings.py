@@ -26,7 +26,7 @@ SECRET_KEY = "django-insecure-7m$2--tc&spgeo*@vvao4pho!@jt1!zat8@59ig6(b+^cqol@f
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["api.echo-sight.com"]
+ALLOWED_HOSTS = ['www.echo-sight.com', 'echo-sight.com', '10.0.31.210', 'api.echo-sight.com']
 
 
 # Application definition
