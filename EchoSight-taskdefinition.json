@@ -26,7 +26,7 @@
             "secrets": [
                 {
                     "name": "OPENAI_API_KEY",
-                    "valueFrom": "arn:aws:secretsmanager:region:account-id:secret:OPENAI_API_KEY"
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:690626078970:secret:OPENAI_API_KEY-OfxCti"
                 }
             ],
             "logConfiguration": {

@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('photo', file);
 
             // Use the fetch API to send an asynchronous request to your server
-            fetch('https://api.echo-sight.com:8000/api/upload/image/', {
+            fetch('https://www.echo-sight.com/api/upload/image/', {
                 method: 'POST',
                 body: formData
             })
