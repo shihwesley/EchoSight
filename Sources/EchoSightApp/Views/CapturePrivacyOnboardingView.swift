@@ -141,9 +141,11 @@ struct CapturePrivacyOnboardingView: View {
                 .font(.body)
 
             Button {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
+                guard let url = URL(string: UIApplication.openSettingsURLString) else {
+                    // UIApplication.openSettingsURLString is always valid; this is unreachable in practice
+                    return
                 }
+                UIApplication.shared.open(url)
             } label: {
                 Label("Open Settings", systemImage: "gear")
                     .frame(maxWidth: .infinity)

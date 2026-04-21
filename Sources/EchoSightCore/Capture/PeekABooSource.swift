@@ -33,6 +33,8 @@ public final class PeekABooSource: PassthroughCaptureSource {
     private var framesContinuation: AsyncStream<CapturedFrame>.Continuation?
     private var _isActive = false
     private var firstCaptureAnnouncedThisSession = false
+    /// Prevents two concurrent `captureFrame()` callers from racing on the shared stream.
+    private var captureInFlight = false
 
     /// 800 ms capture timeout per spec acceptance criterion.
     private let captureTimeoutSeconds: Double = 0.8
@@ -60,16 +62,32 @@ public final class PeekABooSource: PassthroughCaptureSource {
     }
 
     public func start() async throws {
-        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        guard status == .authorized else {
-            if status == .limited {
-                logger.warning("capture.degraded — reason: limitedAccess")
-                throw EchoSightError.captureFailed(nil)
-            }
+        switch PHPhotoLibrary.authorizationStatus(for: .readWrite) {
+        case .authorized:
+            _isActive = true
+            logger.info("capture.started")
+        case .limited:
+            logger.warning("capture.degraded — reason: limitedAccess")
+            throw EchoSightError.captureFailed(
+                NSError(domain: "echosight.capture", code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: "Photos limited access — full access required"])
+            )
+        case .denied, .restricted:
+            logger.warning("capture.failed — reason: photosDenied")
+            throw EchoSightError.captureFailed(
+                NSError(domain: "echosight.capture", code: 2,
+                        userInfo: [NSLocalizedDescriptionKey: "Photos access denied or restricted"])
+            )
+        case .notDetermined:
+            logger.warning("capture.failed — reason: permissionNotDetermined (call requestPhotoLibraryAccess() first)")
+            throw EchoSightError.captureFailed(
+                NSError(domain: "echosight.capture", code: 3,
+                        userInfo: [NSLocalizedDescriptionKey: "Photos permission not yet requested"])
+            )
+        @unknown default:
+            logger.warning("capture.failed — reason: unknownAuthorizationStatus")
             throw EchoSightError.captureFailed(nil)
         }
-        _isActive = true
-        logger.info("capture.started")
     }
 
     public func stop() async {
@@ -81,7 +99,19 @@ public final class PeekABooSource: PassthroughCaptureSource {
     /// Conformance to `PassthroughCaptureSource`. Waits for the next frame with
     /// an 800 ms timeout. The actual capture is triggered by the user's hardware
     /// gesture (Digital Crown + Capture Button) — this method awaits delivery.
+    ///
+    /// Only one concurrent caller is supported. A second call while one is in flight
+    /// throws immediately to prevent both from racing on the same shared stream.
     public func captureFrame() async throws -> CapturedFrame {
+        guard !captureInFlight else {
+            throw EchoSightError.captureFailed(
+                NSError(domain: "echosight.capture", code: 4,
+                        userInfo: [NSLocalizedDescriptionKey: "captureFrame() called while a capture is already in flight"])
+            )
+        }
+        captureInFlight = true
+        defer { captureInFlight = false }
+
         logger.info("capture.requested")
 
         return try await withThrowingTaskGroup(of: CapturedFrame.self) { group in
@@ -93,7 +123,7 @@ public final class PeekABooSource: PassthroughCaptureSource {
                 throw EchoSightError.captureFailed(nil)
             }
 
-            // Timeout
+            // Timeout — throws after 800 ms so the frame waiter task is cancelled
             group.addTask {
                 try await Task.sleep(for: .milliseconds(800))
                 throw EchoSightError.captureFailed(
@@ -102,7 +132,10 @@ public final class PeekABooSource: PassthroughCaptureSource {
                 )
             }
 
-            let result = try await group.next()!
+            // P1-1 fix: use guard let instead of force-unwrap
+            guard let result = try await group.next() else {
+                throw EchoSightError.captureFailed(nil)
+            }
             group.cancelAll()
             return result
         }
@@ -142,8 +175,9 @@ public final class PeekABooSource: PassthroughCaptureSource {
             assetForAlbum = asset
             let lagMs = Int(deliveryTimestamp.timeIntervalSince(shutterTimestamp) * 1000)
             let shutterMs = Int(shutterTimestamp.timeIntervalSinceNow * -1000)
+            let deliveryMs = Int(deliveryTimestamp.timeIntervalSinceNow * -1000)
             logger.info("capture.shutter — shutterMs: \(shutterMs)")
-            logger.info("capture.delivered — deliveryMs: \(lagMs), lagMs: \(lagMs)")
+            logger.info("capture.delivered — deliveryMs: \(deliveryMs), lagMs: \(lagMs)")
         } else {
             // No asset found — use delivery timestamp as best-effort shutter
             shutterTimestamp = deliveryTimestamp

@@ -12,7 +12,7 @@ import UIKit
 ///
 /// When the Enterprise path ships, this stub is replaced with the real implementation
 /// that drives `ARKitSession` with `CameraFrameProvider`.
-public final class CameraFrameProviderSource: PassthroughCaptureSource, @unchecked Sendable {
+public final class CameraFrameProviderSource: PassthroughCaptureSource, Sendable {
 
     // MARK: - Init
 

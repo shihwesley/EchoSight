@@ -100,8 +100,7 @@ struct ClearCapturesButton: View {
         } catch {
             // System dialog cancellation throws — treat as user cancellation, not an error
             let nsError = error as NSError
-            if nsError.domain == "com.apple.photos" && nsError.code == 3072 {
-                // User cancelled the system delete dialog — no-op
+            if nsError.domain == PHPhotosErrorDomain && nsError.code == PHPhotosError.Code.userCancelled.rawValue {
                 logger.info("capture.clearCaptures.cancelled — user dismissed system dialog")
             } else {
                 logger.warning("capture.clearCaptures.error — \(error.localizedDescription)")
