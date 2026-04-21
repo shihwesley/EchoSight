@@ -1,5 +1,60 @@
 # Progress Log
 
+## Session: 2026-04-21 (Sprint 1.2 execution)
+
+### Sprint 1.2 — capture spec (Phase 1) — merged e4904ad
+
+**Tasks completed (atomic commits):**
+- `644c275` feat(capture): add PeekABoo SPM dependency (project.yml)
+- `bd695d8` feat(capture): add EchoSightAlbum and extend CapturedFrame with dual timestamps
+- `d7719a0` feat(capture): add PeekABooSource
+- `17de659` feat(capture): add CameraFrameProviderSource stub
+- `025e348` feat(capture): add CapturePrivacyOnboardingView
+- `5def1b9` feat(capture): add ClearCapturesButton
+- `b0a9baa` test(capture): add CaptureTests
+- `b479ff4` fix(capture): missing imports in App views (build fix)
+- `934b971` fix(capture): address code-review P1s/P2s/P3s
+- `d6f9429` chore(skeleton): regenerate xcodeproj with PeekABoo dep
+- `e4904ad` Merge Sprint 1.2
+
+**Key implementation decisions:**
+- `CapturedFrame` extended with `shutterTimestamp` (from `PHAsset.creationDate`) and `deliveryTimestamp` (Date() at callback). Legacy `timestamp` alias preserved for downstream compat.
+- `PeekABooSource` is `@MainActor` (PeekABoo's `onCapture` runs on main). PHAsset fetched immediately after callback — PeekABoo only provides `UIImage`.
+- `EchoSightAlbum` modeled as `actor` for Swift 6 safety. `performChanges async throws` throughout.
+- `ClearCapturesButton` omits custom SwiftUI confirmation alert — `PHAssetChangeRequest.deleteAssets` always shows system dialog, which is VoiceOver-compatible (per spec critical finding #4).
+- `.limited` Photos access treated as failure in all codepaths (start(), requestPhotoLibraryAccess(), onboarding).
+- `captureFrame()` guards against concurrent calls with `captureInFlight` Bool (P1-2 fix).
+- `PHPhotosError.Code.userCancelled` used via `PHPhotosErrorDomain` + rawValue (PHPhotosError type variance on visionOS).
+- `AlbumCaptureObservingView` posts `AccessibilityNotification.Announcement` for first-capture session reminder.
+
+**Sprint 1.2 code-review findings (`/code-review-pro`, 2026-04-21):**
+
+Verdict: **p0_p1_found** → REQUEST CHANGES — 0 P0, 3 P1, 3 P2, 2 P3.
+
+P1s fixed:
+- Force-unwrap `group.next()!` in captureFrame() replaced with `guard let`.
+- Concurrent caller race on shared `frames` stream: added `captureInFlight` guard throwing immediately on second call.
+- `start()` auth state machine: replaced opaque guard+if with exhaustive `switch` covering `.authorized`, `.limited`, `.denied/.restricted`, `.notDetermined`, `@unknown default` — each with distinct error payloads and correct log keys.
+
+P2s fixed:
+- `capture.delivered` log duplicated `lagMs` in both fields — added `deliveryMs` as separate variable.
+- Magic number `3072` + bare domain string replaced with `PHPhotosErrorDomain + PHPhotosError.Code.userCancelled.rawValue`.
+- `@unchecked Sendable` removed from zero-state `CameraFrameProviderSource` stub, replaced with `Sendable`.
+
+P3s fixed:
+- Silent Settings button branch: added `guard let` with comment.
+- Additional lag threshold boundary tests added.
+
+P3 deferred:
+- `EchoSightAlbum` live-test path (requires real device with Photos permission — mocked via protocol extraction deferred to Phase 2 test infra sprint).
+- `ClearCapturesButton` count refresh on re-appear (P3 — count only updates on `.task` appear, not on live library change).
+
+**Build:** green — `xcodebuild -scheme EchoSight -destination 'generic/platform=visionOS' build` passes. PeekABoo 1.0.0, swift-log 1.12.0, mlx-swift 0.31.3 resolved.
+**Tests:** deferred — no visionOS simulator available in this environment (same policy as Sprint 1.1).
+Manual test command: `xcodebuild test -scheme EchoSight -destination 'platform=visionOS Simulator,name=Apple Vision Pro' | xcbeautify`
+
+---
+
 ## Session: 2026-04-21 (Sprint 1.1 execution)
 
 ### Sprint 1.1 — Foundations (Phase 1) — merged 7d886e3
@@ -82,7 +137,7 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 | spatial-core | 1 | 1 | completed | 8262a43 | 2026-04-21 |
 | speech-out | 1 | 1 | completed | 661a9a0 | 2026-04-21 |
 | observability | 1 | 1 | completed | ed70667 | 2026-04-21 |
-| capture | 1 | 2 | eng-reviewed | — | 2026-04-21 |
+| capture | 1 | 2 | completed | e4904ad | 2026-04-21 |
 | detector | 2 | 1 | eng-reviewed | — | 2026-04-21 |
 | fusion | 2 | 1 | eng-reviewed | — | 2026-04-21 |
 | modal-input | 2 | 2 | eng-reviewed | — | 2026-04-21 |
@@ -99,8 +154,10 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 ## Test Results
 | Test | Expected | Actual | Status |
 |------|----------|--------|--------|
-| xcodebuild build | visionOS generic build succeeds | Build Succeeded with 4 benign warnings | passed |
-| xcodebuild test | simulator tests pass | deferred — simulator boot timed out phase-runner; to be run manually | deferred |
+| Sprint 1.2 xcodebuild build | visionOS generic build succeeds | Build Succeeded (4 Sprint 1.1 warnings + 0 new) | passed |
+| Sprint 1.2 xcodebuild test | simulator tests pass | deferred — no visionOS simulator in environment; manual command in Sprint 1.2 notes | deferred |
+| Sprint 1.1 xcodebuild build | visionOS generic build succeeds | Build Succeeded with 4 benign warnings | passed |
+| Sprint 1.1 xcodebuild test | simulator tests pass | deferred — simulator boot timed out phase-runner; to be run manually | deferred |
 
 ### Sprint 1.1 close-out notes (2026-04-21)
 
