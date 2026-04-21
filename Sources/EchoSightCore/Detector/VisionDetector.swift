@@ -1,0 +1,217 @@
+import CoreML
+import Foundation
+import Logging
+import UIKit
+import Vision
+
+// MARK: - VisionDetector
+
+/// `Detector` implementation backed by the YOLO11n Core ML model.
+///
+/// On load, the model is fetched from the app bundle and compiled into memory
+/// using `.cpuAndNeuralEngine` compute units (preferred for small models on AVP).
+/// A warm-up inference is run against a 1×1 zero image to prime the ANE before
+/// the first real capture arrives.
+///
+/// Each `detect(in:)` call builds a fresh `VNCoreMLRequest` (not stored as a
+/// property — required for Swift 6 Sendable compliance) and runs it synchronously
+/// inside a `withCheckedThrowingContinuation` bridge.
+///
+/// A 2-second timeout wraps each call. Exceeding it returns `[]` and logs
+/// `detector.timeout`.
+public actor VisionDetector: Detector {
+
+    // MARK: - Private state
+
+    private let logger = Logger(label: LogCategories.detector)
+    private var mlModel: MLModel?
+    private var vnModel: VNCoreMLModel?
+    private var _isWarm = false
+    private var _isLoading = false
+
+    // MARK: - Init
+
+    public init() {}
+
+    // MARK: - Detector conformance
+
+    public var isReady: Bool {
+        mlModel != nil && _isWarm
+    }
+
+    /// Load and warm-up the YOLO11n model.
+    ///
+    /// Idempotent: a second call while a load is in progress or already complete
+    /// returns immediately without re-loading.
+    public func load() async throws {
+        guard mlModel == nil, !_isLoading else { return }
+        _isLoading = true
+        defer { _isLoading = false }
+
+        logger.info("detector.warmUp.started")
+        let start = Date()
+
+        let modelURL = try bundledModelURL()
+
+        let config = MLModelConfiguration()
+        config.computeUnits = .cpuAndNeuralEngine
+
+        let loaded: MLModel
+        do {
+            loaded = try await MLModel.load(contentsOf: modelURL, configuration: config)
+        } catch {
+            logger.error("detector.error — reason: modelLoad, detail: \(error.localizedDescription)")
+            throw EchoSightError.modelLoadFailed(modelURL.lastPathComponent)
+        }
+
+        let vnLoaded: VNCoreMLModel
+        do {
+            vnLoaded = try VNCoreMLModel(for: loaded)
+        } catch {
+            logger.error("detector.error — reason: vnModelCreate, detail: \(error.localizedDescription)")
+            throw EchoSightError.modelLoadFailed("VNCoreMLModel creation failed")
+        }
+
+        self.mlModel = loaded
+        self.vnModel = vnLoaded
+
+        // Warm-up: prime the ANE with a dummy 1×1 inference
+        await warmUpInference()
+
+        let durationMs = Int(Date().timeIntervalSince(start) * 1000)
+        logger.info("detector.warmUp.completed — durationMs: \(durationMs)")
+        _isWarm = true
+    }
+
+    public func unload() async {
+        mlModel = nil
+        vnModel = nil
+        _isWarm = false
+        logger.info("detector.unloaded")
+    }
+
+    /// Run object detection on the given frame.
+    ///
+    /// Applies a 2-second timeout. Returns `[]` on timeout rather than throwing,
+    /// to keep the scene-mode pipeline running even if a frame takes too long.
+    public func detect(in frame: CapturedFrame) async throws -> [DetectionResult] {
+        guard let vnModel else {
+            logger.warning("detector.error — reason: modelNotLoaded")
+            throw EchoSightError.detectorUnavailable
+        }
+
+        let frameId = frame.shutterTimestamp.timeIntervalSince1970
+        logger.info("detector.detect.started — frameId: \(frameId)")
+        let start = Date()
+
+        // 2-second timeout guard
+        let results: [DetectionResult]
+        do {
+            results = try await withThrowingTaskGroup(of: [DetectionResult].self) { group in
+                group.addTask {
+                    try await self.runDetection(vnModel: vnModel, image: frame.image, frameId: frameId)
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 2_000_000_000)
+                    return [] // Sentinel: timeout path returns empty
+                }
+                // Take the first result (either inference or timeout)
+                let first = try await group.next() ?? []
+                group.cancelAll()
+                return first
+            }
+        } catch {
+            logger.warning("detector.timeout — frameId: \(frameId)")
+            return []
+        }
+
+        let durationMs = Int(Date().timeIntervalSince(start) * 1000)
+        logger.info("detector.detect.completed — frameId: \(frameId), count: \(results.count), durationMs: \(durationMs)")
+        return results
+    }
+
+    // MARK: - Private helpers
+
+    private func bundledModelURL() throws -> URL {
+        // Look in the bundle for yolo11n-int8.mlpackage or compiled .mlmodelc
+        let bundle = Bundle.main
+        if let url = bundle.url(forResource: "yolo11n-int8", withExtension: "mlpackage") {
+            return url
+        }
+        if let url = bundle.url(forResource: "yolo11n-int8", withExtension: "mlmodelc") {
+            return url
+        }
+        // Also try without the -int8 suffix
+        if let url = bundle.url(forResource: "yolo11n", withExtension: "mlpackage") {
+            return url
+        }
+        if let url = bundle.url(forResource: "yolo11n", withExtension: "mlmodelc") {
+            return url
+        }
+        logger.error("detector.error — reason: modelNotFound — searched bundle for yolo11n-int8.mlpackage")
+        throw EchoSightError.modelLoadFailed("yolo11n-int8.mlpackage not found in app bundle")
+    }
+
+    /// Warm up the ANE by running a dummy inference on a 1×1 black image.
+    private func warmUpInference() async {
+        guard let vnModel else { return }
+        let dummyImage = Self.makeBlackImage(size: CGSize(width: 1, height: 1))
+        guard let cgImage = dummyImage.cgImage else { return }
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        let request = VNCoreMLRequest(model: vnModel)
+        request.imageCropAndScaleOption = .scaleFit
+        try? handler.perform([request])
+    }
+
+    /// Run Vision inference. Must be called from within the actor (vnModel passed in).
+    private func runDetection(vnModel: VNCoreMLModel, image: UIImage, frameId: TimeInterval) async throws -> [DetectionResult] {
+        guard let cgImage = image.cgImage else {
+            logger.warning("detector.error — reason: cgImageNil, frameId: \(frameId)")
+            return []
+        }
+
+        // Build request per-call (not stored) to avoid Swift 6 Sendable issues
+        let request = VNCoreMLRequest(model: vnModel)
+        request.imageCropAndScaleOption = .scaleFit
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            do {
+                try handler.perform([request])
+                let observations = request.results as? [VNRecognizedObjectObservation] ?? []
+                let detections = observations.compactMap { obs -> DetectionResult? in
+                    guard let topLabel = obs.labels.first else { return nil }
+                    // Y-flip: VN bbox has bottom-left origin; DetectionResult uses top-left
+                    let flippedY = 1.0 - obs.boundingBox.origin.y - obs.boundingBox.height
+                    return DetectionResult(
+                        anchorPoint: CGPoint(
+                            x: obs.boundingBox.origin.x + obs.boundingBox.width / 2.0,
+                            y: flippedY + obs.boundingBox.height / 2.0
+                        ),
+                        size: CGSize(
+                            width: obs.boundingBox.width,
+                            height: obs.boundingBox.height
+                        ),
+                        label: topLabel.identifier,
+                        confidence: topLabel.confidence
+                    )
+                }
+                .sorted { $0.confidence > $1.confidence }
+                continuation.resume(returning: detections)
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+
+    // MARK: - Test helpers
+
+    /// Creates a solid black UIImage of the given size.
+    static func makeBlackImage(size: CGSize) -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            UIColor.black.setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+        }
+    }
+}
