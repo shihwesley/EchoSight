@@ -1,0 +1,106 @@
+name: EchoSight
+options:
+  bundleIdPrefix: com.wesleyshih
+  deploymentTarget:
+    visionOS: "2.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: true
+  createIntermediateGroups: true
+
+packages:
+  swift-log:
+    url: https://github.com/apple/swift-log.git
+    from: 1.6.0
+  mlx-swift:
+    url: https://github.com/ml-explore/mlx-swift.git
+    from: 0.21.0
+
+targets:
+  EchoSight:
+    type: application
+    platform: visionOS
+    deploymentTarget: "2.0"
+    sources:
+      - path: Sources/EchoSightApp
+    resources:
+      - path: Sources/EchoSightApp/Info.plist
+        optional: true
+    info:
+      path: Sources/EchoSightApp/Info.plist
+      properties:
+        CFBundleName: EchoSight
+        CFBundleDisplayName: EchoSight
+        CFBundleIdentifier: com.wesleyshih.EchoSight
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        NSPhotoLibraryUsageDescription: "EchoSight reads the passthrough camera to identify objects and text in your environment."
+        NSWorldSensingUsageDescription: "EchoSight maps the space around you to provide spatial audio cues and remember where objects are."
+        NSMicrophoneUsageDescription: "Microphone access is reserved for a future voice-query feature and is not used in v0.1."
+        UILaunchScreen:
+          UIColorName: ""
+          UIImageName: ""
+    entitlements:
+      path: Sources/EchoSightApp/EchoSight.entitlements
+      properties:
+        com.apple.security.application-groups: []
+    dependencies:
+      - package: swift-log
+        product: Logging
+      - target: EchoSightCore
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        ENABLE_STRICT_CONCURRENCY: complete
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        PRODUCT_BUNDLE_IDENTIFIER: com.wesleyshih.EchoSight
+
+  EchoSightCore:
+    type: framework
+    platform: visionOS
+    deploymentTarget: "2.0"
+    sources:
+      - path: Sources/EchoSightCore
+    dependencies:
+      - package: swift-log
+        product: Logging
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        ENABLE_STRICT_CONCURRENCY: complete
+        PRODUCT_BUNDLE_IDENTIFIER: com.wesleyshih.EchoSightCore
+        GENERATE_INFOPLIST_FILE: YES
+
+  EchoSightCoreTests:
+    type: bundle.unit-test
+    platform: visionOS
+    deploymentTarget: "2.0"
+    sources:
+      - path: Tests/EchoSightCoreTests
+    dependencies:
+      - target: EchoSightCore
+      - package: swift-log
+        product: Logging
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.wesleyshih.EchoSightCoreTests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  EchoSight:
+    build:
+      targets:
+        EchoSight: all
+        EchoSightCore: all
+        EchoSightCoreTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - EchoSightCoreTests
+    profile:
+      config: Release
+    archive:
+      config: Release
