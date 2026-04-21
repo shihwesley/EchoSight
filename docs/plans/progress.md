@@ -170,8 +170,9 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 ## 5-Question Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | Sprint 1.1 complete. Ready for Sprint 1.2 (capture spec). |
+| Where am I? | **Phase 1 complete** (Sprints 1.1 + 1.2 merged). At phase-boundary review gate — Phase 2 requires user approval before start. |
 | Where am I going? | Ship v0.1 (Feature 1 + Layer 1 + persistence) on visionOS |
 | What's the goal? | Accessibility-first spatial companion for BLV users, fully local |
-| What have I learned? | See findings.md + Sprint 1.1 close-out notes above |
-| What have I done? | Implemented Phase 1 Sprint 1: root protocols, SwiftPM + Xcode skeleton, Layer 1 ARKit + mesh, SpeechOut actor, observability bootstrap + DebugConsoleView |
+| What have I learned? | See findings.md + Sprint 1.1/1.2 close-out notes above. Key 1.2 finding: PeekABoo API returns `UIImage` only (no `PHAsset`), re-fetch screenshot via `PHAsset.fetchAssets` inside closure. |
+| What have I done? | Phase 1 Sprint 1: root protocols, SwiftPM + Xcode skeleton, Layer 1 ARKit + mesh, SpeechOut actor, observability bootstrap + DebugConsoleView. Phase 1 Sprint 2: capture pipeline (PeekABooSource, EchoSightAlbum, CapturePrivacyOnboardingView, ClearCapturesButton, CameraFrameProviderSource stub, CaptureTests). |
+| What's next? | Phase 2 Sprint 1 (detector + fusion, parallel). Pending user approval at phase gate. |
