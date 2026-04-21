@@ -19,6 +19,17 @@ Four modes, zero voice input, all local inference:
 
 Plus ambient announce: spatial chime on world-anchor novelty, full speech only on cold (>30 min unseen) anchor AND idle user (no gesture/head-motion in last 5 min).
 
+## Module Structure
+
+Two Swift products in `Package.swift`:
+
+| Module | Role |
+|--------|------|
+| `EchoSightCore` | Engine: ARKit, perception, speech, storage. No SwiftUI. Fully unit-testable. |
+| `EchoSightApp` | UI shell: SwiftUI views, WindowGroup, ImmersiveSpace, glue code. Depends on Core. |
+
+The split keeps `EchoSightCore` importable in test targets without pulling in the app lifecycle.
+
 ## Architecture Principles
 
 - **Zero external network at inference time.** All models ship or download once at first launch (~2.6 GB).
@@ -34,6 +45,14 @@ xcodebuild test -scheme EchoSight -destination 'platform=visionOS Simulator,name
 ```
 
 Requires Xcode 16+, visionOS 2.0 SDK, Apple Vision Pro (or simulator) for runtime verification.
+
+## Privacy Posture
+
+- Zero network inference. All models run on-device (local inference only).
+- Photos: full access required (passthrough capture reads camera frames via visionOS 2 API).
+- Microphone: reserved in Info.plist; not used in v0.1.
+- World sensing: required for ARKit mesh reconstruction and anchor persistence.
+- Log exports hash anchor UUIDs (SHA-256). No frames, OCR text, or prompts leave the device.
 
 ## Repo Layout
 
