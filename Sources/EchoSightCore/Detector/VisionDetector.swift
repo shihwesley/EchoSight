@@ -92,8 +92,14 @@ public actor VisionDetector: Detector {
 
     /// Run object detection on the given frame.
     ///
+    /// Run object detection on the given frame.
+    ///
     /// Applies a 2-second timeout. Returns `[]` on timeout rather than throwing,
     /// to keep the scene-mode pipeline running even if a frame takes too long.
+    ///
+    /// Swift 6 note: `VNCoreMLModel` is not Sendable, so Vision inference runs
+    /// synchronously on a background DispatchQueue via `withCheckedThrowingContinuation`.
+    /// This keeps the model on the actor's heap without crossing task boundaries.
     public func detect(in frame: CapturedFrame) async throws -> [DetectionResult] {
         guard let vnModel else {
             logger.warning("detector.error — reason: modelNotLoaded")
@@ -104,21 +110,74 @@ public actor VisionDetector: Detector {
         logger.info("detector.detect.started — frameId: \(frameId)")
         let start = Date()
 
-        // 2-second timeout guard
+        // Run inference synchronously on a background queue.
+        // withCheckedThrowingContinuation suspends the actor until the queue fires.
+        // The 2-second budget is enforced by a DispatchWorkItem deadline.
+        let inferenceQueue = DispatchQueue(label: "echosight.detector.inference", qos: .userInitiated)
         let results: [DetectionResult]
+
         do {
-            results = try await withThrowingTaskGroup(of: [DetectionResult].self) { group in
-                group.addTask {
-                    try await self.runDetection(vnModel: vnModel, image: frame.image, frameId: frameId)
+            results = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[DetectionResult], Error>) in
+                var didResume = false
+                let lock = NSLock()
+
+                let work = DispatchWorkItem {
+                    guard let cgImage = frame.image.cgImage else {
+                        lock.lock()
+                        guard !didResume else { lock.unlock(); return }
+                        didResume = true
+                        lock.unlock()
+                        continuation.resume(returning: [])
+                        return
+                    }
+                    let request = VNCoreMLRequest(model: vnModel)
+                    request.imageCropAndScaleOption = .scaleFit
+                    let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+                    do {
+                        try handler.perform([request])
+                        let observations = request.results as? [VNRecognizedObjectObservation] ?? []
+                        let detections = observations.compactMap { obs -> DetectionResult? in
+                            guard let topLabel = obs.labels.first else { return nil }
+                            let flippedY = 1.0 - obs.boundingBox.origin.y - obs.boundingBox.height
+                            return DetectionResult(
+                                anchorPoint: CGPoint(
+                                    x: obs.boundingBox.origin.x + obs.boundingBox.width / 2.0,
+                                    y: flippedY + obs.boundingBox.height / 2.0
+                                ),
+                                size: CGSize(
+                                    width: obs.boundingBox.width,
+                                    height: obs.boundingBox.height
+                                ),
+                                label: topLabel.identifier,
+                                confidence: topLabel.confidence
+                            )
+                        }.sorted { $0.confidence > $1.confidence }
+
+                        lock.lock()
+                        guard !didResume else { lock.unlock(); return }
+                        didResume = true
+                        lock.unlock()
+                        continuation.resume(returning: detections)
+                    } catch {
+                        lock.lock()
+                        guard !didResume else { lock.unlock(); return }
+                        didResume = true
+                        lock.unlock()
+                        continuation.resume(throwing: error)
+                    }
                 }
-                group.addTask {
-                    try await Task.sleep(nanoseconds: 2_000_000_000)
-                    return [] // Sentinel: timeout path returns empty
+
+                // 2-second timeout
+                inferenceQueue.asyncAfter(deadline: .now() + 2.0) {
+                    lock.lock()
+                    guard !didResume else { lock.unlock(); return }
+                    didResume = true
+                    lock.unlock()
+                    work.cancel()
+                    continuation.resume(returning: [])
                 }
-                // Take the first result (either inference or timeout)
-                let first = try await group.next() ?? []
-                group.cancelAll()
-                return first
+
+                inferenceQueue.async(execute: work)
             }
         } catch {
             logger.warning("detector.timeout — frameId: \(frameId)")
@@ -126,6 +185,9 @@ public actor VisionDetector: Detector {
         }
 
         let durationMs = Int(Date().timeIntervalSince(start) * 1000)
+        if durationMs >= 2000 {
+            logger.warning("detector.timeout — frameId: \(frameId)")
+        }
         logger.info("detector.detect.completed — frameId: \(frameId), count: \(results.count), durationMs: \(durationMs)")
         return results
     }
@@ -153,53 +215,19 @@ public actor VisionDetector: Detector {
     }
 
     /// Warm up the ANE by running a dummy inference on a 1×1 black image.
+    /// Uses the same DispatchQueue path as detect() to keep VNCoreMLModel on the actor heap.
     private func warmUpInference() async {
         guard let vnModel else { return }
         let dummyImage = Self.makeBlackImage(size: CGSize(width: 1, height: 1))
         guard let cgImage = dummyImage.cgImage else { return }
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        let request = VNCoreMLRequest(model: vnModel)
-        request.imageCropAndScaleOption = .scaleFit
-        try? handler.perform([request])
-    }
-
-    /// Run Vision inference. Must be called from within the actor (vnModel passed in).
-    private func runDetection(vnModel: VNCoreMLModel, image: UIImage, frameId: TimeInterval) async throws -> [DetectionResult] {
-        guard let cgImage = image.cgImage else {
-            logger.warning("detector.error — reason: cgImageNil, frameId: \(frameId)")
-            return []
-        }
-
-        // Build request per-call (not stored) to avoid Swift 6 Sendable issues
-        let request = VNCoreMLRequest(model: vnModel)
-        request.imageCropAndScaleOption = .scaleFit
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-            do {
-                try handler.perform([request])
-                let observations = request.results as? [VNRecognizedObjectObservation] ?? []
-                let detections = observations.compactMap { obs -> DetectionResult? in
-                    guard let topLabel = obs.labels.first else { return nil }
-                    // Y-flip: VN bbox has bottom-left origin; DetectionResult uses top-left
-                    let flippedY = 1.0 - obs.boundingBox.origin.y - obs.boundingBox.height
-                    return DetectionResult(
-                        anchorPoint: CGPoint(
-                            x: obs.boundingBox.origin.x + obs.boundingBox.width / 2.0,
-                            y: flippedY + obs.boundingBox.height / 2.0
-                        ),
-                        size: CGSize(
-                            width: obs.boundingBox.width,
-                            height: obs.boundingBox.height
-                        ),
-                        label: topLabel.identifier,
-                        confidence: topLabel.confidence
-                    )
-                }
-                .sorted { $0.confidence > $1.confidence }
-                continuation.resume(returning: detections)
-            } catch {
-                continuation.resume(throwing: error)
+        let inferenceQueue = DispatchQueue(label: "echosight.detector.warmup", qos: .background)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            inferenceQueue.async {
+                let request = VNCoreMLRequest(model: vnModel)
+                request.imageCropAndScaleOption = .scaleFit
+                let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+                try? handler.perform([request])
+                continuation.resume()
             }
         }
     }

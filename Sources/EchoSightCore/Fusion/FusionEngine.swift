@@ -182,32 +182,28 @@ public actor FusionEngine {
 
     // MARK: - Private: Classification extraction
 
-    /// Extracts a classification string from a RealityKit entity's SceneUnderstandingComponent.
+    /// Extracts a classification string from a RealityKit entity.
     ///
-    /// Must be called on the main actor (SceneUnderstandingComponent access is @MainActor).
+    /// Must be called on the main actor (component access is @MainActor).
     /// Returns nil in simulator (entity won't have SceneUnderstandingComponent attached).
     ///
-    /// `classifications` is a visionOS 2.0+ OptionSet backed by `MeshAnchor.MeshClassification`.
+    /// Classification granularity note:
+    /// `SceneUnderstandingComponent` on visionOS 2.0 does not expose a
+    /// per-entity `classifications` OptionSet at the RealityKit layer —
+    /// per-face classification is available via `MeshAnchor.geometry.classifications`
+    /// in the ARKit layer. For v0.1, we confirm the entity is an environment-mesh
+    /// entity (has SceneUnderstandingComponent) and return "mesh" as a non-nil
+    /// signal. LabelReconciler rule 5 then applies: prefer detector label,
+    /// keep mesh distance. Post-v0.1: cross-reference hit entity UUID against
+    /// MeshAnchorTracker for per-anchor dominant classification.
     @MainActor
     private func classificationFromComponent(entity: Entity) -> String? {
-        guard let comp = entity.components[SceneUnderstandingComponent.self] else {
+        guard entity.components.has(SceneUnderstandingComponent.self) else {
             return nil
         }
-        // entityType distinguishes mesh chunk (environment) from face (person mesh).
-        // For environment mesh the classifications OptionSet carries the room-element type.
-        // We read classifications if available; fall back to .unknown if not.
-        //
-        // classifications is a visionOS 2.0+ OptionSet on SceneUnderstandingComponent.
-        // Confirmed in EchoSight cheat sheet and WWDC sessions but not listed in
-        // the online API reference — treat as available on device, nil in simulator.
-        let c = comp.classifications
-        if c.contains(.door)    { return LabelReconciler.MeshClass.door }
-        if c.contains(.window)  { return LabelReconciler.MeshClass.window }
-        if c.contains(.seat)    { return LabelReconciler.MeshClass.seat }
-        if c.contains(.table)   { return LabelReconciler.MeshClass.table }
-        if c.contains(.wall)    { return LabelReconciler.MeshClass.wall }
-        if c.contains(.floor)   { return LabelReconciler.MeshClass.floor }
-        if c.contains(.ceiling) { return LabelReconciler.MeshClass.ceiling }
+        // Entity is confirmed as a scene-understanding mesh entity.
+        // Return a non-nil classification signal so the reconciler uses mesh distance
+        // rather than the 3m default. Label comes from the detector (rule 5).
         return LabelReconciler.MeshClass.unknown
     }
 
