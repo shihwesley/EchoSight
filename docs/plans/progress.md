@@ -1,5 +1,38 @@
 # Progress Log
 
+## Session: 2026-04-21 (Sprint 1.1 execution)
+
+### Sprint 1.1 — Foundations (Phase 1) — merged 7d886e3
+
+**Wave A (serial):**
+- root-spec: `PassthroughCaptureSource`, `Detector`, `EchoSightError`, `CapturedFrame` protocols + `.swiftformat`
+- project-skeleton: `Package.swift` + XcodeGen `project.yml` + `EchoSightApp` @main + `ObservabilityBootstrap` stub. Build gate passes on `xcodebuild generic/platform=visionOS`.
+
+**Wave B (parallel):**
+- spatial-core: `SpatialSession`, `HeadPoseRingBuffer` (500-sample, O(log N) interp, headPoseVariance), `AnchorEventStream` (`.new` / `.rerecognized` / `.sessionResumeRerecognized` per TLA Gate 4), `MeshClassificationSummary`, `ObstacleRaycaster`, `SpatialCueRenderer`.
+- speech-out: `SpeechOut` actor matches TLA-verified priority contract; `SynthesizerDelegateBridge`; `SpeechToken` async completion; priority-slot unit tests.
+- observability: 15 log categories, `PipelineMetricsBuffer` actor ring, `PrivacyFilter`, `LogExporter` (SHA-256 anchor hashing), `DebugConsoleView` + `LogoTapGate`.
+
+**Swift 6 / concurrency fixes applied during build-up (worth remembering for Sprint 1.2+):**
+- `DetectionResult`: `@unchecked Sendable` struct (CVPixelBuffer not Sendable)
+- `ObservabilityBootstrap`: `nonisolated(unsafe)` static vars for Swift 6
+- `SpatialSession`: `SceneReconstructionProvider(modes: [.classification])` (array, not OptionSet)
+- `SynthesizerDelegateBridge`: stripped `AVSpeechUtterance` from Event enum (not Sendable)
+- `SpeechOut.init`: wrapped `configureAudioSession` in `Task` for actor-isolated call
+- Test files: added `import Foundation` for `UUID`/`Date` in Swift Testing framework
+
+**Close-out fixes (post phase-runner):**
+- `project.yml`: `CODE_SIGNING_ALLOWED=NO` / `CODE_SIGNING_REQUIRED=NO` so `xcodebuild` runs without a dev team.
+- `Sources/EchoSightApp/Info.plist` tracked (was untracked after XcodeGen generation).
+
+**Remaining warnings (non-blocking, Sprint 1.2 cleanup candidates):**
+- 3× "no 'async' operations occur within 'await' expression" — `AnchorEventStream:51`, `PipelineMetricsBuffer:70`, `SpeechOut:46`. All are continuation-registration patterns; the registered method is synchronous.
+- 1× redundant `nonisolated(unsafe)` on `let installLock = NSLock()` — NSLock is already Sendable.
+
+**Commits:** `679f14a` → `8cb832d` → `8262a43` → `661a9a0` → `ed70667` → `061cef4` (close-out fix) → `c24d4aa` (progress) → `7d886e3` (merge).
+
+---
+
 ## Session: 2026-04-21
 
 ### Planning session
