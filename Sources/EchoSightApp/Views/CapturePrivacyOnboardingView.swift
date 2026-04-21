@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 import PeekABoo
 
 // MARK: - CapturePrivacyOnboardingView

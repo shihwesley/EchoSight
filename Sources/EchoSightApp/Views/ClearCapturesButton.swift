@@ -1,6 +1,7 @@
 import SwiftUI
 import Photos
 import Logging
+import EchoSightCore
 
 // MARK: - ClearCapturesButton
 
