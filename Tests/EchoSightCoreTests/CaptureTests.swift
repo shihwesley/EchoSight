@@ -1,4 +1,5 @@
 import Foundation
+import QuartzCore
 import Testing
 
 @testable import EchoSightCore
@@ -87,6 +88,30 @@ struct CapturedFrameTests {
         } else {
             Issue.record("Expected .degraded(.limitedAccess), got \(frame.outcome)")
         }
+    }
+
+
+    @Test
+    func machTimestampIsPositiveAndRecent() {
+        let before = CACurrentMediaTime()
+        let frame = CapturedFrame(
+            image: .init(),
+            shutterTimestamp: Date(),
+            deliveryTimestamp: Date()
+        )
+        let after = CACurrentMediaTime()
+        #expect(frame.machTimestamp >= before)
+        #expect(frame.machTimestamp <= after + 0.001)
+        #expect(frame.machTimestamp > 0)
+    }
+
+    @Test
+    func legacyInitHasPositiveMachTimestamp() {
+        let before = CACurrentMediaTime()
+        let frame = CapturedFrame(image: .init(), timestamp: Date())
+        let after = CACurrentMediaTime()
+        #expect(frame.machTimestamp >= before)
+        #expect(frame.machTimestamp <= after + 0.001)
     }
 
     @Test

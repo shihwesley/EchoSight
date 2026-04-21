@@ -1,5 +1,6 @@
 import Foundation
 import Photos
+import QuartzCore
 import UIKit
 import Logging
 
@@ -148,6 +149,7 @@ public final class PeekABooSource: PassthroughCaptureSource {
     /// Records delivery timestamp immediately on entry, then fetches the
     /// corresponding `PHAsset` to obtain the authoritative shutter timestamp.
     public func handleCapture(_ image: UIImage) async {
+        let machTimestamp = CACurrentMediaTime()
         let deliveryTimestamp = Date()
         logger.info("capture.delivered — at: \(deliveryTimestamp.timeIntervalSince1970)")
 
@@ -219,6 +221,7 @@ public final class PeekABooSource: PassthroughCaptureSource {
             image: image,
             shutterTimestamp: shutterTimestamp,
             deliveryTimestamp: deliveryTimestamp,
+            machTimestamp: machTimestamp,
             outcome: outcome
         )
         framesContinuation?.yield(frame)

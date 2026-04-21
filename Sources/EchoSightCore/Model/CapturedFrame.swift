@@ -1,5 +1,6 @@
 import UIKit
 import CoreVideo
+import QuartzCore
 
 // MARK: - CapturedFrame
 
@@ -8,12 +9,14 @@ import CoreVideo
 /// Produced by any `PassthroughCaptureSource` implementer (capture spec)
 /// and consumed by `Detector` implementers (detector spec) and the fusion pipeline.
 ///
-/// Carries two timestamps to support fusion's head-pose interpolation accuracy:
+/// Carries two wall-clock timestamps plus a Mach-time timestamp:
 /// - `shutterTimestamp`: from `PHAsset.creationDate` — truth of when the capture occurred
 /// - `deliveryTimestamp`: `Date()` at the moment the capture callback fired
+/// - `machTimestamp`: `CACurrentMediaTime()` captured when PeekABoo's closure fires
 ///
-/// The delta between them measures PhotoKit delivery lag (typically 200-600 ms).
-/// Fusion uses `shutterTimestamp` for pose lookup; the delta informs confidence degradation.
+/// `machTimestamp` is the monotonic Mach time required by
+/// `WorldTrackingProvider.queryDeviceAnchor(atTimestamp:)`. The wall-clock
+/// timestamps remain available for `HeadPoseRingBuffer` lookups (which use `Date`).
 ///
 /// Uses `@unchecked Sendable` because `metadata` is `[String: Any]`, which
 /// cannot be statically proven Sendable. Callers must not mutate metadata
@@ -26,15 +29,20 @@ public struct CapturedFrame: @unchecked Sendable {
     public let image: UIImage
 
     /// When the physical shutter occurred. Sourced from `PHAsset.creationDate`.
-    /// This is the timestamp used by the head-pose ring buffer for pose interpolation.
+    /// Used by `HeadPoseRingBuffer` for pose interpolation (wall-clock domain).
     public let shutterTimestamp: Date
 
     /// When the capture callback fired (i.e., when PhotoKit delivered the asset).
     /// Always >= `shutterTimestamp`. The delta is PhotoKit delivery lag.
     public let deliveryTimestamp: Date
 
+    /// Monotonic Mach time (`CACurrentMediaTime()`) recorded when PeekABoo's
+    /// capture closure fired. This is the clock domain expected by
+    /// `WorldTrackingProvider.queryDeviceAnchor(atTimestamp:)`.
+    public let machTimestamp: TimeInterval
+
     /// Convenience alias for the shutter timestamp. Downstream specs that only
-    /// need one timestamp use this property.
+    /// need one wall-clock timestamp use this property.
     public var timestamp: Date { shutterTimestamp }
 
     /// Arbitrary key/value metadata attached by the capture source.
@@ -82,12 +90,14 @@ public struct CapturedFrame: @unchecked Sendable {
         image: UIImage,
         shutterTimestamp: Date,
         deliveryTimestamp: Date,
+        machTimestamp: TimeInterval = CACurrentMediaTime(),
         metadata: [String: Any] = [:],
         outcome: Outcome = .ok
     ) {
         self.image = image
         self.shutterTimestamp = shutterTimestamp
         self.deliveryTimestamp = deliveryTimestamp
+        self.machTimestamp = machTimestamp
         self.metadata = metadata
         self.outcome = outcome
     }
@@ -97,6 +107,7 @@ public struct CapturedFrame: @unchecked Sendable {
         self.image = image
         self.shutterTimestamp = timestamp
         self.deliveryTimestamp = timestamp
+        self.machTimestamp = CACurrentMediaTime()
         self.metadata = metadata
         self.outcome = .ok
     }
