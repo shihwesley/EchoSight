@@ -31,6 +31,28 @@
 
 **Commits:** `679f14a` → `8cb832d` → `8262a43` → `661a9a0` → `ed70667` → `061cef4` (close-out fix) → `c24d4aa` (progress) → `7d886e3` (merge).
 
+### Sprint 1.1 review findings (`/code-review-pro`, 2026-04-21)
+
+Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
+
+**P1 fixed in this commit:**
+- **TokenChannel double-unlock** (`Sources/EchoSightCore/Speech/SpeechToken.swift:67–82`). `defer { lock.unlock() }` combined with an explicit `lock.unlock()` in the `if let stored` branch caused a second unlock on an already-unlocked NSLock (UB — crash or silent corruption). Existing tests only exercise single-waiter paths, so this was latent. Fixed by removing the `defer` and unlocking explicitly in both branches. Added `TokenChannelTests.swift` with 50- and 100-waiter stress tests + concurrent stored-value readers to prevent regression.
+
+**P2 — deferred to Sprint 1.2 cleanup:**
+- `SpeechOut.cancel()` emits `.idle` before `AVSpeechSynthesizer` confirms cancellation (`SpeechOut.swift:131–150`). Downstream timing consumers (ambient chimes) will measure wrong interval. Fix: let `processDelegateEvents` handle `.idle` via `case .cancelled`, consistent with `.finished`.
+- `MeshAnchorTracker.rebuildClassificationCounts` is a no-op (`_ = entity`). After any mesh removal, `currentSummary()` returns `confidence: 0`. Fix: cache last-known-good summary; return stale not empty.
+- Anchor ID 8-char prefix logs plaintext before `PrivacyFilter.hashAnchorId()` runs (`AnchorEventStream.swift:97–101`). Fix: apply filter at call site before emission.
+
+**P3 — deferred:**
+- `HeadPoseRingBuffer` `@unchecked Sendable` with no call-site `// SAFETY:` comment.
+- `ObstacleRaycaster.lastFireTime` never read/written — dead state.
+- `DetectionResult.mask: CVPixelBuffer?` needs `LockingPixelBuffer` wrapper before Phase 2 segmentation lands.
+
+**Strengths noted:**
+- TLA-verified priority contract implemented faithfully (`SpeechOut.swift:99–113` matches all 5 verified actions).
+- Privacy-first design: `PrivacyFilter` applied in `LogExporter` before any write; `PipelineEvent.metadata: [String: String]` prevents structured data leakage.
+- Test coverage breadth on `HeadPoseRingBuffer` + `SpeechOut` is good — new `TokenChannelTests` closes the multi-waiter gap.
+
 ---
 
 ## Session: 2026-04-21

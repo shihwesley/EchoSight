@@ -49,6 +49,7 @@
 		EF9B799AC81D7D1A75A21D42 /* EchoSightCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 69D4CC8FE2A2FFCD06BF6CF3 /* EchoSightCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		F3F24F88102C22D8BCB89A1A /* DebugConsoleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F33B707A05EE9DC0225BF2B0 /* DebugConsoleView.swift */; };
 		F73141BA68053BDDBD1FA2BE /* PrivacyFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00C3D674516D4718C653485C /* PrivacyFilter.swift */; };
+		FBC461430C3A1FF4D4417ADD /* TokenChannelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9134DBB05713237C8C1E1211 /* TokenChannelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -114,6 +115,7 @@
 		752D3FD72AA9A224AAD6F119 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7A43BB4EAC86BD7D05B9C986 /* PipelineEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineEvent.swift; sourceTree = "<group>"; };
 		7AEA4B72F12F9D5AD96782D1 /* CapturedFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturedFrame.swift; sourceTree = "<group>"; };
+		9134DBB05713237C8C1E1211 /* TokenChannelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenChannelTests.swift; sourceTree = "<group>"; };
 		9B3DCF2B65844F4DADAB5500 /* SpeechState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechState.swift; sourceTree = "<group>"; };
 		9BC8CCDA778D9310DC543646 /* AnchorChangeEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorChangeEvent.swift; sourceTree = "<group>"; };
 		A0B3560ED98DDCE7448AB840 /* WorldImmersiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldImmersiveView.swift; sourceTree = "<group>"; };
@@ -261,6 +263,7 @@
 				20BD0F98BFE3D02F896A1C7E /* PipelineMetricsBufferTests.swift */,
 				B91748781AA2C6CA532D5A28 /* PlaceholderTests.swift */,
 				5226C009862D1B1A1D4F422D /* SpeechOutTests.swift */,
+				9134DBB05713237C8C1E1211 /* TokenChannelTests.swift */,
 			);
 			path = EchoSightCoreTests;
 			sourceTree = "<group>";
@@ -437,6 +440,7 @@
 				7BB9B49FC0EB363B498343DB /* PipelineMetricsBufferTests.swift in Sources */,
 				BC2ECF013B5F6A9FA4F82776 /* PlaceholderTests.swift in Sources */,
 				70815166477BBE85535A6A13 /* SpeechOutTests.swift in Sources */,
+				FBC461430C3A1FF4D4417ADD /* TokenChannelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

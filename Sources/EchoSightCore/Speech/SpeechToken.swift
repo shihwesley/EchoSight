@@ -69,13 +69,13 @@ public final class TokenChannel: Sendable {
         get async {
             await withCheckedContinuation { continuation in
                 lock.lock()
-                defer { lock.unlock() }
                 if let stored {
+                    let value = stored
                     lock.unlock()
-                    continuation.resume(returning: stored)
-                    lock.lock()
+                    continuation.resume(returning: value)
                 } else {
                     waiters.append(continuation)
+                    lock.unlock()
                 }
             }
         }
