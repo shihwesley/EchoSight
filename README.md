@@ -1,46 +1,52 @@
-# EchoSight: 360-Degree Awareness Navigator
+# EchoSight (Apple Vision Pro)
 
-## Introduction
-EchoSight is an innovative mobile web application designed to enhance the mobility and independence of visually impaired individuals. By providing audio descriptions of their surroundings through the use of the phone's camera, EchoSight offers a 360-degree awareness tool in the palm of your hand. This application combines the power of Computer Vision, Natural Language Processing (NLP), and Text-to-Speech (TTS) technologies to deliver real-time information about the environment.
+Accessibility-first spatial companion for blind and low-vision (BLV) users. Runs fully on-device on Apple Vision Pro.
 
-## Features
-- Real-time object and scene recognition using the phone's camera
-- Contextual and spatial audio descriptions for comprehensive environmental awareness
-- Intuitive web interface specifically designed for ease of use by visually impaired individuals
-- No installation required; accessible directly via web browser on most modern smartphones
-- Strong commitment to user privacy and data security
+## Status
 
-## Getting Started
+**v0.1 in planning → Sprint 1.1 starting.** See `docs/plans/manifest.md` for the spec map and `docs/plans/progress.md` for execution state.
 
-### Prerequisites
-- A smartphone with a camera and internet connectivity
-- Headphones for the best audio description experience
+## v0.1 Scope
 
-### Accessing the Web App
-1. Open the web browser on your smartphone.
-2. Go to [EchoSight Web App URL].
-3. Grant the necessary permissions for the app to access the phone's camera.
-4. Use the app's features to navigate and interact with your surroundings.
+Four modes, zero voice input, all local inference:
 
-## Usage
-To use EchoSight, follow these simple steps:
-1. Ensure your device's internet connection is active.
-2. Point your device's camera at the environment around you.
-3. The app will automatically begin to describe the scene audibly.
-4. Use gestures or voice commands to interact with the application if needed.
+| Mode | Trigger | What it does |
+|------|---------|--------------|
+| **Scene** | Digital Crown → `scene` + button | Describes what's in front of you via on-device detector + TTS |
+| **Recall** | Crown → `recall` + button | 1st press: Gemma-generated room gestalt. 2nd press within 5 s: top-N nearest annotations |
+| **Read** | Crown → `read` + button | Captures passthrough, runs `VNRecognizeTextRequest`, speaks the text |
+| **Silent** | Crown → `silent` | Mutes normal speech; ambient cold-anchor speech and chimes still fire |
+
+Plus ambient announce: spatial chime on world-anchor novelty, full speech only on cold (>30 min unseen) anchor AND idle user (no gesture/head-motion in last 5 min).
+
+## Architecture Principles
+
+- **Zero external network at inference time.** All models ship or download once at first launch (~2.6 GB).
+- **Layer 1 always-on.** Scene reconstruction + world tracking run continuously with negligible power cost.
+- **Annotations anchored to world.** Persistent visionOS world anchors back cross-session recall.
+- **Single `SpeechOut` actor** owns `AVSpeechSynthesizer` with priority slots (`.high` preempts `.normal`, ducks via `.duckOthers`).
+
+## Build
+
+```bash
+xcodebuild -scheme EchoSight -destination 'generic/platform=visionOS' build | xcbeautify
+xcodebuild test -scheme EchoSight -destination 'platform=visionOS Simulator,name=Apple Vision Pro' | xcbeautify
+```
+
+Requires Xcode 16+, visionOS 2.0 SDK, Apple Vision Pro (or simulator) for runtime verification.
+
+## Repo Layout
+
+- `docs/plans/` — manifest, 16 spec files, findings, workflow, progress log
+- `EchoSight-AVP-Brainstorm.md` — original brainstorm (planning input, 2026-04-11)
+- `archive/legacy-web/` — previous web-app version of the project (Django backend + React frontend)
+- `.claude/` — project-local Claude Code config and research cache
+
+## History
+
+This repository previously hosted a Django + React web-app prototype of EchoSight (2023). Earlier work is preserved under `archive/legacy-web/` with full git history via `git log --follow`. The visionOS rewrite begins 2026-04-21 as a greenfield native app.
 
 ## Authors
-- Pranathi Mokshagundam
-- Chaitra Vishweshwaraiah
-- Wesley Shih
 
-## Acknowledgments
-We extend our heartfelt gratitude to all individuals and organizations that have supported the development and refinement of EchoSight.
-
-
-## Disclaimer
-EchoSight is designed as a supplementary navigational aid and should be used in conjunction with other navigation methods recommended for visually impaired users.
-
-## Contact Information
-For further information, feedback, or inquiries, get in touch with us at contact@echosightweb.com.
-
+Wesley Shih, Pranathi Mokshagundam, Chaitra Vishweshwaraiah (original web app).
+Wesley Shih (visionOS rewrite).

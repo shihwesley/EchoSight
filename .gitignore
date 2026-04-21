@@ -1,2 +1,18 @@
 node_modules/
 .DS_Store
+
+# Xcode
+*.xcuserstate
+xcuserdata/
+**/*.xcodeproj/project.xcworkspace/xcuserdata/
+**/*.xcodeproj/xcuserdata/
+build/
+DerivedData/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Local env
+*.env
+.env.local
