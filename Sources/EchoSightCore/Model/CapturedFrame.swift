@@ -8,6 +8,13 @@ import CoreVideo
 /// Produced by any `PassthroughCaptureSource` implementer (capture spec)
 /// and consumed by `Detector` implementers (detector spec) and the fusion pipeline.
 ///
+/// Carries two timestamps to support fusion's head-pose interpolation accuracy:
+/// - `shutterTimestamp`: from `PHAsset.creationDate` — truth of when the capture occurred
+/// - `deliveryTimestamp`: `Date()` at the moment the capture callback fired
+///
+/// The delta between them measures PhotoKit delivery lag (typically 200-600 ms).
+/// Fusion uses `shutterTimestamp` for pose lookup; the delta informs confidence degradation.
+///
 /// Uses `@unchecked Sendable` because `metadata` is `[String: Any]`, which
 /// cannot be statically proven Sendable. Callers must not mutate metadata
 /// after initialization.
@@ -18,9 +25,17 @@ public struct CapturedFrame: @unchecked Sendable {
     /// The captured image from the passthrough camera feed.
     public let image: UIImage
 
-    /// When the frame was captured. Used by the head-pose ring buffer for
-    /// spatial-core pose interpolation at this exact instant.
-    public let timestamp: Date
+    /// When the physical shutter occurred. Sourced from `PHAsset.creationDate`.
+    /// This is the timestamp used by the head-pose ring buffer for pose interpolation.
+    public let shutterTimestamp: Date
+
+    /// When the capture callback fired (i.e., when PhotoKit delivered the asset).
+    /// Always >= `shutterTimestamp`. The delta is PhotoKit delivery lag.
+    public let deliveryTimestamp: Date
+
+    /// Convenience alias for the shutter timestamp. Downstream specs that only
+    /// need one timestamp use this property.
+    public var timestamp: Date { shutterTimestamp }
 
     /// Arbitrary key/value metadata attached by the capture source.
     /// Keys used by downstream specs:
@@ -29,11 +44,60 @@ public struct CapturedFrame: @unchecked Sendable {
     /// - `"exposureDuration"`: shutter speed in seconds (`Double`)
     public let metadata: [String: Any]
 
+    // MARK: - Outcome
+
+    /// Outcome of the capture pipeline step.
+    public enum Outcome: Sendable {
+        /// Frame produced and delivered normally.
+        case ok
+        /// Frame produced but with degraded quality or timing.
+        case degraded(DegradedReason)
+        /// Frame could not be produced.
+        case failed(FailedReason)
+    }
+
+    public enum DegradedReason: Sendable {
+        /// PhotoKit delivered the asset more than 3 seconds after the shutter.
+        /// Fusion's head-pose interpolation may land at the wrong world position.
+        case latePhotoKitDelivery
+        /// User granted only "Limited" Photos access; album operations unavailable.
+        case limitedAccess
+    }
+
+    public enum FailedReason: Sendable {
+        /// Photos permission denied or restricted.
+        case photosDenied
+        /// PeekABoo capture hung past the 800 ms budget.
+        case timeout
+        /// Enterprise CameraFrameProvider path — not available in v0.1.
+        case unavailable
+    }
+
+    /// The outcome of this frame's capture pipeline.
+    public let outcome: Outcome
+
     // MARK: - Init
 
+    public init(
+        image: UIImage,
+        shutterTimestamp: Date,
+        deliveryTimestamp: Date,
+        metadata: [String: Any] = [:],
+        outcome: Outcome = .ok
+    ) {
+        self.image = image
+        self.shutterTimestamp = shutterTimestamp
+        self.deliveryTimestamp = deliveryTimestamp
+        self.metadata = metadata
+        self.outcome = outcome
+    }
+
+    /// Legacy convenience init for callers that only have a single timestamp.
     public init(image: UIImage, timestamp: Date, metadata: [String: Any] = [:]) {
         self.image = image
-        self.timestamp = timestamp
+        self.shutterTimestamp = timestamp
+        self.deliveryTimestamp = timestamp
         self.metadata = metadata
+        self.outcome = .ok
     }
 }
