@@ -1,5 +1,4 @@
 import UIKit
-import CoreVideo
 
 // MARK: - DetectionResult
 
@@ -7,7 +6,7 @@ import CoreVideo
 ///
 /// Coordinates are in the normalized image space of the source `CapturedFrame`
 /// (origin at top-left, range 0.0–1.0 for both axes).
-public struct DetectionResult: @unchecked Sendable {
+public struct DetectionResult: Sendable {
 
     // MARK: - Properties
 
@@ -25,7 +24,7 @@ public struct DetectionResult: @unchecked Sendable {
 
     /// Optional instance segmentation mask aligned to the bounding box region.
     /// Nil for detectors that produce only bounding boxes (v0.1 Vision placeholder).
-    public let mask: CVPixelBuffer?
+    public let mask: LockingPixelBuffer?
 
     // MARK: - Init
 
@@ -34,7 +33,7 @@ public struct DetectionResult: @unchecked Sendable {
         size: CGSize,
         label: String,
         confidence: Float,
-        mask: CVPixelBuffer? = nil
+        mask: LockingPixelBuffer? = nil
     ) {
         self.anchorPoint = anchorPoint
         self.size = size

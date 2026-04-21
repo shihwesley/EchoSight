@@ -51,6 +51,7 @@
 		E181A313A872BC50C218DCBB /* PipelineEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A43BB4EAC86BD7D05B9C986 /* PipelineEvent.swift */; };
 		EA248E840CA40B8D0C277E91 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F49549A2B8C8E62590C6B270 /* RootView.swift */; };
 		EB602DC3CB4845E5372B11C0 /* SpeechUtterance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 073EDD00A8E334E6B151C09D /* SpeechUtterance.swift */; };
+		EC6E3B1D6A440D366EB20D10 /* LockingPixelBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8EC35F1520B281C2C7DD92 /* LockingPixelBuffer.swift */; };
 		ED40CC78FDD4D1A273B28C02 /* LogExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A527F1EF645C3E55983284B3 /* LogExporter.swift */; };
 		EF361F2ECFF40CC65E42101E /* EchoSightError.swift in Sources */ = {isa = PBXBuildFile; fileRef = F73E96B7EECC5F38C445006E /* EchoSightError.swift */; };
 		EF9B799AC81D7D1A75A21D42 /* EchoSightCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 69D4CC8FE2A2FFCD06BF6CF3 /* EchoSightCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -140,6 +141,7 @@
 		B6E699A896A701D2EC6E00C6 /* ClearCapturesButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearCapturesButton.swift; sourceTree = "<group>"; };
 		B91748781AA2C6CA532D5A28 /* PlaceholderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceholderTests.swift; sourceTree = "<group>"; };
 		BE6280E2E4921434DF729DAC /* EchoSightApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EchoSightApp.swift; sourceTree = "<group>"; };
+		CE8EC35F1520B281C2C7DD92 /* LockingPixelBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockingPixelBuffer.swift; sourceTree = "<group>"; };
 		D33D5F558C86620EC3D0A615 /* DebugConsoleSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugConsoleSection.swift; sourceTree = "<group>"; };
 		D693D398184A95FB1A4BA48A /* PassthroughCaptureSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassthroughCaptureSource.swift; sourceTree = "<group>"; };
 		E2A1C6A8574D2FD39FF92206 /* EchoSight.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EchoSight.entitlements; sourceTree = "<group>"; };
@@ -195,6 +197,7 @@
 			children = (
 				FFC2120F893A51C6CF0C03BB /* Detector.swift */,
 				F73E96B7EECC5F38C445006E /* EchoSightError.swift */,
+				CE8EC35F1520B281C2C7DD92 /* LockingPixelBuffer.swift */,
 				D693D398184A95FB1A4BA48A /* PassthroughCaptureSource.swift */,
 			);
 			path = Protocols;
@@ -502,6 +505,7 @@
 				49941E20540F7130229A225A /* EchoSightAlbum.swift in Sources */,
 				EF361F2ECFF40CC65E42101E /* EchoSightError.swift in Sources */,
 				6E1867EA94E42B5FF94E2DCE /* HeadPoseRingBuffer.swift in Sources */,
+				EC6E3B1D6A440D366EB20D10 /* LockingPixelBuffer.swift in Sources */,
 				87CDD9A7F0DE6D481EFC9207 /* LogCategories.swift in Sources */,
 				ED40CC78FDD4D1A273B28C02 /* LogExporter.swift in Sources */,
 				1CCEEF7376B8F440E905A267 /* MeshAnchorTracker.swift in Sources */,
