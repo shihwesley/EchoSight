@@ -54,6 +54,9 @@ targets:
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         PRODUCT_BUNDLE_IDENTIFIER: com.wesleyshih.EchoSight
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGNING_REQUIRED: "NO"
 
   EchoSightCore:
     type: framework

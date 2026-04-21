@@ -396,6 +396,11 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					3988F55E693AA653C6440CE2 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
 			};
 			buildConfigurationList = BA9FC50E8EAD75E561D60AAB /* Build configuration list for PBXProject "EchoSight" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -624,7 +629,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_ENTITLEMENTS = Sources/EchoSightApp/EchoSight.entitlements;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_STRICT_CONCURRENCY = complete;
 				INFOPLIST_FILE = Sources/EchoSightApp/Info.plist;
@@ -645,7 +653,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_ENTITLEMENTS = Sources/EchoSightApp/EchoSight.entitlements;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_STRICT_CONCURRENCY = complete;
 				INFOPLIST_FILE = Sources/EchoSightApp/Info.plist;
