@@ -129,24 +129,28 @@ public actor SpeechOut {
     }
 
     /// Cancel a specific token if it is currently speaking or queued.
+    ///
+    /// Resolves the caller's token immediately so awaiters unblock, but keeps
+    /// `currentToken` and `.speaking` state set until `AVSpeechSynthesizerDelegate`
+    /// fires `.cancelled`. This matches the contract that `.idle` means audio has
+    /// stopped, not "stop was requested" — downstream consumers (ambient chimes)
+    /// rely on the timing accuracy.
     public func cancel(_ token: SpeechToken) {
         guard currentToken?.id == token.id else { return }
         synthesizer.stopSpeaking(at: .immediate)
         currentToken?.resolve(.cancelled)
-        currentToken = nil
-        currentPriority = nil
-        emitState(.idle)
         log.info("speak.cancelled", metadata: ["token": .string(token.id.uuidString.prefix(8) + "…"), "source": "cancel(token:)"])
     }
 
     /// Cancel every in-flight utterance immediately.
+    ///
+    /// Same timing contract as `cancel(_:)`: token resolves now for awaiter
+    /// responsiveness, but `.idle` is emitted only when the synthesizer's
+    /// delegate confirms the stop.
     public func cancelAll() {
         guard currentToken != nil else { return }
         synthesizer.stopSpeaking(at: .immediate)
         currentToken?.resolve(.cancelled)
-        currentToken = nil
-        currentPriority = nil
-        emitState(.idle)
         log.info("speak.cancelled", metadata: ["source": "cancelAll()"])
     }
 
@@ -168,14 +172,15 @@ public actor SpeechOut {
                 emitState(.idle)
                 log.info("speak.finished")
             case .cancelled:
-                // Token already resolved in `cancel`/`cancelAll`/preemption path.
-                // Guard against double-resolve on AVFoundation's async delegate.
-                if currentToken != nil {
-                    currentToken?.resolve(.cancelled)
-                    currentToken = nil
-                    currentPriority = nil
-                    emitState(.idle)
-                }
+                // AVFoundation confirmed the synthesizer has actually stopped.
+                // Now — and only now — is it true that no audio is playing, so
+                // `.idle` can be emitted. `TokenChannel.resolve` is idempotent,
+                // so resolving again here is safe if `cancel`/`cancelAll`/
+                // preemption path already resolved the token.
+                currentToken?.resolve(.cancelled)
+                currentToken = nil
+                currentPriority = nil
+                emitState(.idle)
             }
         }
     }

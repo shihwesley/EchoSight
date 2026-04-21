@@ -81,11 +81,14 @@ public actor LogExporter {
     }
 
     /// If the key is `anchorId` or contains `"anchor"`, SHA-256 hash the value.
+    /// Delegates to `PrivacyFilter.hashAnchorId` so call sites and exporter
+    /// produce the same 12-char digest for a given UUID.
     private func hashIfAnchorId(key: String, value: String) -> String {
         guard key.lowercased().contains("anchor") else { return value }
-        let data = Data(value.utf8)
-        let hash = SHA256.hash(data: data)
-        return hash.compactMap { String(format: "%02x", $0) }.joined().prefix(12) + "…"
+        guard let uuid = UUID(uuidString: value) else {
+            return value
+        }
+        return PrivacyFilter.hashAnchorId(uuid)
     }
 
     private func writeToDocuments(content: String) throws -> URL {

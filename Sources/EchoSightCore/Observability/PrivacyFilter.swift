@@ -1,8 +1,10 @@
+import CryptoKit
 import Foundation
 
 // MARK: - PrivacyFilter
 
-/// Sanitizes `PipelineEvent` metadata before log export.
+/// Sanitizes `PipelineEvent` metadata before log export, and provides the
+/// canonical anchor-ID hashing helper used at every log call site.
 ///
 /// Strips metadata keys matching sensitive patterns (content, text, frame,
 /// prompt, transcript) so raw captured text, OCR results, and Gemma prompts
@@ -37,5 +39,16 @@ public enum PrivacyFilter {
     public static func isSensitive(key: String) -> Bool {
         let lower = key.lowercased()
         return sensitivePatterns.contains { lower.contains($0) }
+    }
+
+    /// Returns the 12-hex-char SHA-256 prefix of a UUID for use in log lines.
+    ///
+    /// Use this at the call site of any log emission that mentions an anchor
+    /// identifier so raw UUIDs never reach stdout or OSLog, even before
+    /// `LogExporter` runs.
+    public static func hashAnchorId(_ id: UUID) -> String {
+        let data = Data(id.uuidString.utf8)
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined().prefix(12) + "…"
     }
 }

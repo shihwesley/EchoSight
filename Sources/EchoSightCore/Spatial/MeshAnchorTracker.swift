@@ -18,6 +18,10 @@ public final class MeshAnchorTracker {
     /// Live mesh entities keyed by ARKit anchor ID.
     private(set) public var entities: [UUID: ModelEntity] = [:]
 
+    /// Per-anchor classification + face count, used to maintain
+    /// `classificationCounts` incrementally (add on upsert, subtract on removal).
+    private var anchorContributions: [UUID: (cls: MeshClassificationSummary.MeshClass, faces: Int)] = [:]
+
     /// Triangle counts per classification, updated on each mesh update.
     private var classificationCounts: [MeshClassificationSummary.MeshClass: Int] = [:]
     private var totalTriangles: Int = 0
@@ -35,7 +39,7 @@ public final class MeshAnchorTracker {
 
         case .removed:
             entities.removeValue(forKey: anchor.id)
-            rebuildClassificationCounts()
+            removeClassificationContribution(for: anchor.id)
         }
     }
 
@@ -93,20 +97,32 @@ public final class MeshAnchorTracker {
         // Full per-face classification requires iterating `anchor.geometry.classifications`.
         let faceCount = anchor.geometry.faces.count
         let cls = primaryClassification(from: anchor)
-        classificationCounts[cls, default: 0] += faceCount
 
-        // Rebuild total.
-        totalTriangles = classificationCounts.values.reduce(0, +)
+        // If this anchor was already contributing, subtract the old values first
+        // so an update doesn't double-count.
+        if let old = anchorContributions[anchor.id] {
+            classificationCounts[old.cls, default: 0] -= old.faces
+            if (classificationCounts[old.cls] ?? 0) <= 0 {
+                classificationCounts.removeValue(forKey: old.cls)
+            }
+            totalTriangles -= old.faces
+        }
+
+        anchorContributions[anchor.id] = (cls, faceCount)
+        classificationCounts[cls, default: 0] += faceCount
+        totalTriangles += faceCount
     }
 
-    private func rebuildClassificationCounts() {
-        classificationCounts = [:]
-        totalTriangles = 0
-        for (_, entity) in entities {
-            // Re-aggregate from remaining entities; simplified without per-face data.
-            // Phase 2 adds per-face classification for higher accuracy.
-            _ = entity
+    private func removeClassificationContribution(for anchorId: UUID) {
+        guard let contribution = anchorContributions.removeValue(forKey: anchorId) else {
+            return
         }
+        classificationCounts[contribution.cls, default: 0] -= contribution.faces
+        if (classificationCounts[contribution.cls] ?? 0) <= 0 {
+            classificationCounts.removeValue(forKey: contribution.cls)
+        }
+        totalTriangles -= contribution.faces
+        if totalTriangles < 0 { totalTriangles = 0 }
     }
 
     private func primaryClassification(from anchor: MeshAnchor) -> MeshClassificationSummary.MeshClass {

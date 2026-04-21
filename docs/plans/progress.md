@@ -38,10 +38,10 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 **P1 fixed in this commit:**
 - **TokenChannel double-unlock** (`Sources/EchoSightCore/Speech/SpeechToken.swift:67–82`). `defer { lock.unlock() }` combined with an explicit `lock.unlock()` in the `if let stored` branch caused a second unlock on an already-unlocked NSLock (UB — crash or silent corruption). Existing tests only exercise single-waiter paths, so this was latent. Fixed by removing the `defer` and unlocking explicitly in both branches. Added `TokenChannelTests.swift` with 50- and 100-waiter stress tests + concurrent stored-value readers to prevent regression.
 
-**P2 — deferred to Sprint 1.2 cleanup:**
-- `SpeechOut.cancel()` emits `.idle` before `AVSpeechSynthesizer` confirms cancellation (`SpeechOut.swift:131–150`). Downstream timing consumers (ambient chimes) will measure wrong interval. Fix: let `processDelegateEvents` handle `.idle` via `case .cancelled`, consistent with `.finished`.
-- `MeshAnchorTracker.rebuildClassificationCounts` is a no-op (`_ = entity`). After any mesh removal, `currentSummary()` returns `confidence: 0`. Fix: cache last-known-good summary; return stale not empty.
-- Anchor ID 8-char prefix logs plaintext before `PrivacyFilter.hashAnchorId()` runs (`AnchorEventStream.swift:97–101`). Fix: apply filter at call site before emission.
+**P2 — all three fixed in follow-up commit:**
+- `SpeechOut.cancel()` / `cancelAll()`: `emitState(.idle)` and `currentToken` clearing moved out of the sync cancel paths into the delegate `.cancelled` handler. `.idle` now only fires when `AVSpeechSynthesizer` confirms the actual stop. Token resolution stays synchronous in `cancel` so awaiters unblock immediately; `TokenChannel.resolve` is idempotent so the delegate's re-resolve is safe.
+- `MeshAnchorTracker`: replaced the no-op `rebuildClassificationCounts` with incremental counting via a new `anchorContributions: [UUID: (cls, faces)]` dict. Each add/update upserts the per-anchor contribution; each remove subtracts. `currentSummary()` now reflects remaining anchors accurately instead of returning zero after any removal.
+- `AnchorEventStream`: log sites for `.new` / `.rerecognized` / `.sessionResumeRerecognized` now call `PrivacyFilter.hashAnchorId(anchorId)` before emission — the SHA-256 12-char digest is the same one `LogExporter` uses, so stdout and exported logs produce matching identifiers. `PrivacyFilter.hashAnchorId` lifted from `LogExporter.hashIfAnchorId` to be the canonical helper.
 
 **P3 — deferred:**
 - `HeadPoseRingBuffer` `@unchecked Sendable` with no call-site `// SAFETY:` comment.

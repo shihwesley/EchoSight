@@ -93,13 +93,17 @@ public actor AnchorEventStream {
         let event = AnchorChangeEvent(anchorId: anchorId, kind: kind, timestamp: Date())
         emit(event)
 
+        let hashedId = PrivacyFilter.hashAnchorId(anchorId)
         switch kind {
         case .new:
-            log.info("anchor.new", metadata: ["anchorId": .string(anchorId.uuidString.prefix(8) + "…")])
+            log.info("anchor.new", metadata: ["anchorId": .string(hashedId)])
         case .rerecognized:
-            log.info("anchor.rerecognized", metadata: ["anchorId": .string(anchorId.uuidString.prefix(8) + "…")])
+            log.info("anchor.rerecognized", metadata: ["anchorId": .string(hashedId)])
         case .sessionResumeRerecognized:
-            log.info("anchor.sessionResumeRerecognized", metadata: ["seenSetSize": .string("\(seenThisSession.count)")])
+            log.info("anchor.sessionResumeRerecognized", metadata: [
+                "anchorId": .string(hashedId),
+                "seenSetSize": .string("\(seenThisSession.count)"),
+            ])
         }
     }
 
