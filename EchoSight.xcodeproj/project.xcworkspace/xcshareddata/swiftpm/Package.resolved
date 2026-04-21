@@ -1,5 +1,5 @@
 {
-  "originHash" : "2668a80bba874ea0459c6b6a0adf3712559db65610b6d5fccce68dae6171b715",
+  "originHash" : "ebbdd4163f7b4e83cea555cc055cef6fdcbce668139ef756da14d5c83b9eb334",
   "pins" : [
     {
       "identity" : "mlx-swift",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "61b9e011e09a62b489f6bd647958f1555bdf2896",
         "version" : "0.31.3"
+      }
+    },
+    {
+      "identity" : "peekaboo",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/OmChachad/PeekABoo.git",
+      "state" : {
+        "revision" : "f42c24072251514ea34f8d4aad9aeb19ac0a149f",
+        "version" : "1.0.0"
       }
     },
     {
