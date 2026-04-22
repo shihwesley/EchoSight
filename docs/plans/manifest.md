@@ -114,9 +114,9 @@ graph TD
 | capture | specs/capture-spec.md | 1 | 2 | eng-reviewed | 160 | PeekABoo-backed capture source |
 | detector | specs/detector-spec.md | 2 | 1 | eng-reviewed | 150 | Vision/YOLO detector behind protocol |
 | fusion | specs/fusion-spec.md | 2 | 1 | eng-reviewed | 200 | 2D->3D + label reconciliation + main-actor raycast |
-| modal-input | specs/modal-input-spec.md | 2 | 2 | tla-verified | 180 | Crown-cycles-modes + Button-fire event bus |
-| scene-description | specs/scene-description-spec.md | 2 | 2 | eng-reviewed | 210 | Scene mode pipeline (binds speech-out) |
-| ocr | specs/ocr-spec.md | 2 | 2 | eng-reviewed | 210 | Read mode via VNRecognizeTextRequest |
+| modal-input | specs/modal-input-spec.md | 2 | 2 | completed | 180 | Crown-cycles-modes + Button-fire event bus |
+| scene-description | specs/scene-description-spec.md | 2 | 2 | completed | 210 | Scene mode pipeline (binds speech-out) |
+| ocr | specs/ocr-spec.md | 2 | 2 | completed | 210 | Read mode via VNRecognizeTextRequest |
 | annotation-store | specs/annotation-store-spec.md | 3 | 1 | eng-reviewed | 250 | Annotations + anchor metadata + rehydrator |
 | gemma-enrichment | specs/gemma-enrichment-spec.md | 3 | 1 | eng-reviewed | 280 | Three-consumer priority queue + preemption cadence |
 | spatial-recall | specs/spatial-recall-spec.md | 3 | 2 | tla-verified | 200 | Recall state machine (owns 2-press timer) |

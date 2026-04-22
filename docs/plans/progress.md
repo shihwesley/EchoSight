@@ -1,5 +1,51 @@
 # Progress Log
 
+## Session: 2026-04-21 (Sprint 2.2 execution)
+
+### Sprint 2.2 — modes (Phase 2 Sprint 2) — merged ad6da8e
+
+**Wave A (serial — foundation):**
+- `abf3ffa` feat(modal-input): add Mode enum and event types
+- `fc9241d` feat(modal-input): implement CrownQuantizer with step accumulation
+- `80c198b` feat(modal-input): implement ModalInputCoordinator actor with event streams
+- `b7b73c6` feat(modal-input): add HardwareEventBridge ViewModifier with VoiceOver rotor
+- `f2501a7` test(modal-input): unit tests for coordinator and quantizer
+- `4ff6ecc` chore(modal-input): regenerate xcodeproj with modal-input sources
+
+**Wave B (parallel — scene-description + ocr):**
+- scene-description (3 commits): `186c446` → `a8b6ffc`
+- ocr (2 commits): `584fee7`
+- shared tests: `7197b66`
+- xcodeproj: `f3cff0c`
+
+**Close-out:**
+- `da93821` fix(sprint-2.2): address code-review P1s
+- `ad6da8e` Merge Sprint 2.2 — modes (Phase 2 Sprint 2)
+
+**Key implementation decisions:**
+- visionOS does not expose Digital Crown rotation events to third-party apps (system-reserved). v0.1 maps: single `SpatialTapGesture` → button fire, double tap → mode advance. `AVCaptureEventInteraction` (physical Capture Button) deferred to v1.0 (requires entitlement).
+- `CrownQuantizer` is a pure value type with sub-threshold accumulation. `ModalInputCoordinator` is an actor with two `AsyncStream`s with `.bufferingNewest(1)` policy. TLA-verified invariants hold.
+- `HardwareEventBridge` is a `ViewModifier` (not a class) — required because `@State` properties for Crown tracking need a SwiftUI lifecycle.
+- `VNRecognizedTextObservation` is not `Sendable`. Solved with `RawTextObservation` (Sendable value type) extracted inside the Vision callback before resuming `CheckedContinuation` — same pattern as Sprint 2.1 `VisionDetector`.
+- `ReadingOrderSorter` operates on `RawTextObservation` (not `VNRecognizedTextObservation`) for Swift 6 compliance.
+- `DescriptionTemplateFormatter` and `SalienceScorer` are public pure functions in `EchoSightCore` — shared with `spatial-recall` spec per design.
+- `SceneDescriptionPipeline` passes `scene: nil` to `FusionEngine.fuse` — FusionEngine falls back to 3 m default. v1.0 will inject a live `RealityKit.Scene` via main actor hop.
+- Mode confirmation speech: `.normal` priority for all modes except silent-mode switch itself (`.high`, spoken once to confirm the toggle).
+
+**Sprint 2.2 code-review findings (`/code-review-pro`, 2026-04-21):**
+- **P0:** None.
+- **P1 (fixed):** (1) `ModalInputCoordinator.applyMode` logged `modal.mode.changed` with already-mutated `currentMode` as the "from" value — duplicate data, not accurate. Removed log from `applyMode`; callers hold `from` before mutation. (2) `SceneDescriptionPipeline.runPipeline` contained dead `MainActor.run { return [] }` block producing unused `candidates` var — removed.
+- **P2 (deferred):** (1) `CrownQuantizer.process` integer truncation on sign-boundary edge case. (2) `DescriptionTemplateFormatter.roundedDistance` uses float equality `rounded == 1.0` (epsilon-fragile). (3) `[weak self]` in actor `Task` closures (unnecessary; actors don't form retain cycles with Task). (4) Single vs double `SpatialTapGesture` on same view — no explicit gesture priority; system should disambiguate but HIG recommends `simultaneousGesture` or priority ordering. (5) `SceneDescriptionPipeline` not yet wired to a real `RealityKit.Scene`.
+
+**HIG audit (modal-input, 2026-04-21):**
+- VoiceOver rotor enumeration via `accessibilityRotor` with named entries — correct per HIG.
+- Accessibility label + hint set on input surface — correct.
+- Double-tap vs single-tap gesture disambiguation: system handles, but P2 to add explicit priority (`.highPriorityGesture` for double tap or `simultaneousGesture`).
+- Mode labels are short and action-oriented ("describe mode", "read mode") — correct.
+
+**Build:** green — `xcodebuild -scheme EchoSight -destination 'generic/platform=visionOS' build` passes. Used `-derivedDataPath` pointing to existing DerivedData with mlx-swift cached; worktree hit git submodule clone failure on fresh resolution (network `Connection reset by peer`).
+**Tests:** deferred — visionOS simulator policy (same as Sprints 1.1, 1.2, 2.1). Manual command: `xcodebuild test -scheme EchoSight -destination 'platform=visionOS Simulator,name=Apple Vision Pro' | xcbeautify`.
+
 ## Session: 2026-04-21 (Sprint 2.1 execution)
 
 ### Sprint 2.1 — detector + fusion (Phase 2) — merged 0f1d67c
@@ -200,9 +246,9 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 | capture | 1 | 2 | completed | e4904ad | 2026-04-21 |
 | detector | 2 | 1 | completed | 0f1d67c | 2026-04-21 |
 | fusion | 2 | 1 | completed | 0f1d67c | 2026-04-21 |
-| modal-input | 2 | 2 | eng-reviewed | — | 2026-04-21 |
-| scene-description | 2 | 2 | eng-reviewed | — | 2026-04-21 |
-| ocr | 2 | 2 | eng-reviewed | — | 2026-04-21 |
+| modal-input | 2 | 2 | completed | ad6da8e | 2026-04-21 |
+| scene-description | 2 | 2 | completed | ad6da8e | 2026-04-21 |
+| ocr | 2 | 2 | completed | ad6da8e | 2026-04-21 |
 | annotation-store | 3 | 1 | eng-reviewed | — | 2026-04-21 |
 | gemma-enrichment | 3 | 1 | eng-reviewed | — | 2026-04-21 |
 | spatial-recall | 3 | 2 | eng-reviewed | — | 2026-04-21 |
@@ -214,6 +260,8 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 ## Test Results
 | Test | Expected | Actual | Status |
 |------|----------|--------|--------|
+| Sprint 2.2 xcodebuild build | visionOS generic build succeeds | Build Succeeded (0 new warnings, 0 errors) | passed |
+| Sprint 2.2 xcodebuild test | simulator tests pass | deferred — visionOS simulator policy; manual: `xcodebuild test -scheme EchoSight -destination 'platform=visionOS Simulator,name=Apple Vision Pro' \| xcbeautify` | deferred |
 | Sprint 2.1 xcodebuild build | visionOS generic build succeeds | Build Succeeded (1 Sprint 1.1 NSLock warning, 0 new) | passed |
 | Sprint 2.1 xcodebuild test | simulator tests pass | deferred — phase-runner sim-setup stall; manual command in Sprint 2.1 notes | deferred |
 | Sprint 1.2 xcodebuild build | visionOS generic build succeeds | Build Succeeded (4 Sprint 1.1 warnings + 0 new) | passed |
@@ -232,9 +280,9 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 ## 5-Question Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | **Phase 2 Sprint 1 complete** (detector + fusion merged at `0f1d67c`). Within-phase, so no between-phases gate — ready for Sprint 2.2 (modal-input, then scene-description + ocr in parallel). |
+| Where am I? | **Phase 2 Sprint 2 complete** (modal-input + scene-description + ocr merged at `ad6da8e`). Phase 2 done. Between-phases gate applies before Phase 3 (annotation-store → gemma-enrichment → spatial-recall + ambient-announce + onboarding). |
 | Where am I going? | Ship v0.1 (Feature 1 + Layer 1 + persistence) on visionOS |
 | What's the goal? | Accessibility-first spatial companion for BLV users, fully local |
-| What have I learned? | See findings.md + Sprint 2.1 close-out notes above. Key 2.1 findings: Vision bbox Y-flip (bottom-left → top-left), `Scene.raycast` needs `mask: .sceneUnderstanding` or mesh hits silently fail, `PixelToRay` vFOV must divide tangents not radians, `SceneReconstructionProvider.isSupported` gate required for simulator. |
-| What have I done? | Phase 1: foundations (1.1) + capture (1.2). Phase 2 Sprint 1: detector (VisionDetector actor + CoreML YOLO11n + DefaultQuerySet + FalconDetector stub + tests) and fusion (FusionEngine two-tier + PixelToRay + LabelReconciler + AnnotationCandidate + FovCalibrationView + tests). |
+| What have I learned? | See findings.md + sprint notes above. Key 2.2 findings: visionOS has no `digitalCrownRotation` for third-party apps (system-reserved); `VNRecognizedTextObservation` not `Sendable` — extract fields inside Vision callback (same pattern as VisionDetector); `ModalInputCoordinator` as actor with `AsyncStream` + `.bufferingNewest(1)` is clean TLA-verified input layer; `HardwareEventBridge` must be `ViewModifier` not class (needs `@State` lifecycle). |
+| What have I done? | Phase 1: foundations (1.1) + capture (1.2). Phase 2 Sprint 1: detector + fusion. Phase 2 Sprint 2: modal-input (Mode enum + CrownQuantizer + ModalInputCoordinator actor + HardwareEventBridge ViewModifier + VoiceOver rotor), scene-description (SceneDescriptionPipeline + DescriptionTemplateFormatter + SalienceScorer), ocr (OcrPipeline + ReadingOrderSorter + TextConfidenceFilter + RawTextObservation). |
 | What's next? | Phase 2 Sprint 2: modal-input first (sequential), then scene-description + ocr in parallel. Within-phase auto gate — proceeds without user approval per workflow.md. |
