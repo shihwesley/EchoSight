@@ -330,3 +330,78 @@ Re-runnable: `java -cp /usr/local/lib/tla2tools.jar tlc2.TLC -config <NAME>.cfg 
 - TLC covers reachable state combinations; it does not prove real-time latency budgets (2-s p95 recall, 200 ms chime, etc.). Those remain empirical acceptance criteria.
 - The model treats each action as atomic. In Swift, an `actor` provides the atomicity guarantee required to match this model. The Gate 2 `SilentTogglePreemptsHigh` action assumes `AmbientAnnounceCoordinator`'s `ModeChangeEvent` handler runs fully before any other anchor/speech work — a direct property of actor serialization. Implementation must not leak out of actor isolation.
 
+## Phase 2 Execution Findings (2026-04-21 / 2026-04-22)
+
+Cross-spec decisions that emerged during Sprint 2.1 (detector + fusion) and Sprint 2.2 (modal-input + scene-description + ocr), beyond what the planning-era specs captured. Recorded here so they survive into Phase 3 and later.
+
+### Input Layer — Crown API scope change
+
+The TLA `modal-input` spec assumed `digitalCrownRotation` was available. It is not — the modifier ships in visionOS but is **private / system-reserved**, not part of the public SDK surface for third-party apps. Sprint 2.2 pivoted the hardware-event layer onto `SpatialTapGesture` as a proxy:
+
+- **Single tap** → `ModeFiredEvent(mode: currentMode)` (equivalent to Capture Button press)
+- **Double tap** → `ModeChangeEvent(from: …, to: nextMode)` (equivalent to Crown step)
+
+The `ModalInputCoordinator` contract and both `AsyncStream<*Event>` shapes are unchanged — only the hardware bridge (`HardwareEventBridge` ViewModifier) differs from the TLA assumption. The two-stream event bus is what downstream specs (`spatial-recall`, `ambient-announce`, `scene-description`, `ocr`) subscribe to, so their TLA assumptions hold. When Apple opens the Crown API (or if the app runs on a future hardware input), the bridge can swap back with no ripple.
+
+Device-Button remains reserved for v1.0 gestures that currently conflict with double-tap semantics.
+
+### Vision Framework ↔ Swift 6 Concurrency Patterns
+
+Vision framework types (`VNRecognizedObjectObservation`, `VNRecognizedTextObservation`, `VNCoreMLModel`, `VNCoreMLRequest`) are not `Sendable`. Two patterns emerged for crossing them into `async` / actor contexts:
+
+1. **Value-type extraction inside the Vision callback.** Before the continuation resumes, copy the needed fields into a local Sendable value type. Used by Sprint 2.2 OCR:
+
+   ```swift
+   struct RawTextObservation: Sendable {
+       let text: String
+       let confidence: Float
+       let boundingBox: CGRect
+   }
+   // Inside handler.perform callback, before continuation.resume:
+   let raws = observations.map { RawTextObservation(
+       text: $0.topCandidates(1).first?.string ?? "",
+       confidence: $0.confidence,
+       boundingBox: $0.boundingBox
+   )}
+   continuation.resume(returning: raws)
+   ```
+
+   Downstream sorting, filtering, and TTS operate on the Sendable `Raw*` type. The Vision observation never escapes the callback.
+
+2. **`@preconcurrency import Vision`** for actor-owned models that must stay on the actor's heap. Applied to `VisionDetector` (Sprint 2.1 P2 cleanup, 2026-04-22). The actor owns `VNCoreMLModel` / `VNCoreMLRequest` lifetime; the preconcurrency demotion reflects the invariant that these never cross the actor boundary unprotected.
+
+Either path works. Prefer (1) for pipelines (clean Sendable-by-default). Prefer (2) for long-lived heap-resident framework objects where extracting would require copying megabytes on every call.
+
+### Actor + DispatchQueue Bridging
+
+When an actor must call a synchronous framework API (Vision, Core ML, Speech), allocate the `DispatchQueue` **once** as an instance `let` on the actor, not per-call. `withCheckedThrowingContinuation { queue.async { … } }` is the standard bridge. Sprint 2.1's initial implementation allocated a fresh queue per `detect(in:)`; corrected in 2026-04-22 close-out.
+
+### Vision Pixel-to-Ray Math
+
+- **Bounding-box Y-flip** — Vision emits `origin.y` in **bottom-left** normalized space. `DetectionResult` (and everything downstream) uses **top-left**. Convention: `topLeftY = 1.0 - bbox.origin.y - bbox.height`. Lock this at the Vision boundary; never propagate bottom-left coordinates past the detector.
+- **vFOV from hFOV + aspect** — operate on **tangents**, not radians: `tanV = tan(hFovRad / 2) / aspect`. Dividing radians directly (`vFov = hFov / aspect`) is wrong except at `aspect = 1.0` — a latent bug until a real 16:9 device capture exercised it (Sprint 2.1 review finding).
+
+### RealityKit Raycast Mask
+
+`Scene.raycast` with default collision mask silently misses mesh entities created by `SceneReconstructionProvider`. Always pass `mask: .sceneUnderstanding` when raycasting against the world mesh. Lives in `FusionEngine` — do not lift the mask up to callers.
+
+### Simulator Compatibility Guards
+
+- `SceneReconstructionProvider.isSupported` must gate `arkitSession.run([.sceneReconstruction, …])`. The visionOS simulator crashes otherwise. `SpatialSession` logs a warning and drops the `sceneReconstruction` provider when running in simulator.
+- Simulator boot for `xcodebuild test` exceeds the phase-runner's 600 s stream watchdog. Sprint tests are run manually on device. Build-only verification is the CI gate until a device-attached test lane exists.
+
+### SpeechOut Call-Site Convention
+
+`SpeechOut.speak(_:priority:)` is synchronous and non-throwing — it returns a `SpeechToken` whose `.completion` is the sole `async` surface. Call sites **must not** wrap it in `try`/`do-catch`. Correct pattern:
+
+```swift
+let token = await speechOut.speak(utterance, priority: .normal)   // actor-isolated, non-throwing
+let outcome = await token.completion                               // async
+```
+
+(Scene-description shipped with redundant `try/catch` in Sprint 2.2; fixed on close-out.)
+
+### Sendable Static Locks
+
+`NSLock`, `DispatchQueue`, and most `final` types from Foundation/Dispatch conform to `Sendable` with internal synchronization. Do not mark these with `nonisolated(unsafe)` — use that modifier only on genuinely non-Sendable mutable static state (e.g., a `static var installed = false` Bool protected by an external lock).
+

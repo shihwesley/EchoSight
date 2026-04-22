@@ -1,5 +1,41 @@
 # Progress Log
 
+## Session: 2026-04-22 (Phase 2 close-out housekeeping)
+
+### Phase 2 gate status
+
+All Phase 2 specs (detector, fusion, modal-input, scene-description, ocr) shipped and merged. Pre-Phase-3 housekeeping run on 2026-04-22 to clear the carry-over warning list, land the Sprint 2.1 P2s that were deferred at sprint boundaries, and refresh `findings.md` with Phase 2 execution decisions.
+
+**Housekeeping commits (4):**
+- `3cdeeaa` fix(scene-description): drop redundant try/catch on non-throwing SpeechOut.speak — four Sprint 2.2 warnings cleared
+- `076aa8e` fix(sprint-2.1): address deferred P2 code-review items — VisionDetector actor-owned `inferenceQueue` + `@preconcurrency import Vision` for VNCoreMLModel captures; FovCalibrationView three PixelToRay calls → one
+- `69a6143` fix(observability): drop unnecessary `nonisolated(unsafe)` on NSLock — Sprint 1.1 carry-over warning
+- (this commit) docs: findings.md Phase 2 Execution Findings section + progress.md close-out entry
+
+**Build verification (post-housekeeping):** `xcodebuild -scheme EchoSight -destination 'generic/platform=visionOS' build` passes with **0 warnings, 0 errors**. Counted via `xcodebuild … 2>&1 | grep -c "warning:"` = 0 and `grep -c "error:"` = 0.
+
+**Tests:** deferred (same policy as Sprints 1.1–2.2 — visionOS simulator boot exceeds phase-runner watchdog). Manual command: `xcodebuild test -scheme EchoSight -destination 'platform=visionOS Simulator,name=Apple Vision Pro' | xcbeautify`.
+
+### Consciously deferred into Phase 3 backlog
+
+Not blocking Phase 3 start, but worth picking up during a future quiet interval:
+
+- **Sprint 2.1 P2 #2** — `VisionDetector.detect(in:)` uses a `DispatchWorkItem` + `NSLock` + `didResume` race-guard pattern for its 2-second timeout. The spec-recommended `withThrowingTaskGroup` rewrite is stylistic only — `handler.perform` is synchronous and cannot be interrupted either way. Deferred until sim test coverage exists to verify the refactored race semantics on the ANE path. Inline note left in `VisionDetector.swift:detect(in:)`.
+- **Sprint 2.1 P3** — duplicate doc comment on `VisionDetector.detect()` (lines 93–95) and the tautological `#expect(Bool(true), …)` in `VisionDetectorTests.swift:193`. Cosmetic.
+- **Sprint 2.2 P2 (5 items)** from phase-runner review — CrownQuantizer sign-boundary truncation, roundedDistance float equality, `[weak self]` in actor Tasks, single/double tap gesture priority arbitration, `SceneDescriptionPipeline` nil-scene handling. Each is isolated and doesn't block the event-bus contract downstream specs subscribe to.
+
+### Phase 2 → Phase 3 readiness
+
+- Phase 2 gate checklist (workflow.md §§17-25):
+  - [x] All Phase 2 spec tasks `completed` (6/6)
+  - [x] Build green (`xcodebuild … build`, 0 warnings / 0 errors)
+  - [ ] Tests green — deferred (environment policy)
+  - [x] HIG quick-audit: modal-input's SpatialTapGesture proxy + VoiceOver rotor fallback documented in Sprint 2.2 notes; no shipping UI outside DEBUG from Sprint 2.1
+  - [x] `findings.md` updated (Phase 2 Execution Findings section added 2026-04-22)
+- `between_phases: review` gate for Phase 3 start — ready for user approval. Phase 3 first work: Sprint 3.1 (annotation-store + gemma-enrichment, partial parallel — gemma depends on annotation-store API).
+
+---
+
 ## Session: 2026-04-21 (Sprint 2.2 execution)
 
 ### Sprint 2.2 — modes (Phase 2 Sprint 2) — merged ad6da8e
