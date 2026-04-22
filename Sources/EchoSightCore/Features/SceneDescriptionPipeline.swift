@@ -173,19 +173,15 @@ public actor SceneDescriptionPipeline {
         guard !Task.isCancelled else { return }
         log.info("scene.speak.started")
         let speakStart = Date()
-        do {
-            let token = try await speechOut.speak(
-                SpeechUtterance(text: text),
-                priority: .normal
-            )
-            let outcome = await token.completion
-            log.info("scene.speak.finished", metadata: [
-                "durationMs": "\(Int(Date().timeIntervalSince(speakStart) * 1000))",
-                "outcome": "\(outcome)"
-            ])
-        } catch {
-            log.warning("scene.speak.failed", metadata: ["error": "\(error)"])
-        }
+        let token = await speechOut.speak(
+            SpeechUtterance(text: text),
+            priority: .normal
+        )
+        let outcome = await token.completion
+        log.info("scene.speak.finished", metadata: [
+            "durationMs": "\(Int(Date().timeIntervalSince(speakStart) * 1000))",
+            "outcome": "\(outcome)"
+        ])
 
         // 7. Enqueue for annotation-store (fire-and-forget)
         if !fusedCandidates.isEmpty {
@@ -201,13 +197,9 @@ public actor SceneDescriptionPipeline {
 
     private func speakFallback() async {
         guard !Task.isCancelled else { return }
-        do {
-            _ = try await speechOut.speak(
-                SpeechUtterance(text: "I don't detect anything in front of you"),
-                priority: .normal
-            )
-        } catch {
-            log.warning("scene.fallback.speak.failed", metadata: ["error": "\(error)"])
-        }
+        _ = await speechOut.speak(
+            SpeechUtterance(text: "I don't detect anything in front of you"),
+            priority: .normal
+        )
     }
 }
