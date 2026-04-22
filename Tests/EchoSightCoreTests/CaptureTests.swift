@@ -223,16 +223,16 @@ struct CameraFrameProviderErrorTests {
     }
 }
 
-// MARK: - PeekABooSource concurrency guard tests
+// MARK: - PhotosLibraryCaptureSource concurrency guard tests
 
 @MainActor
-struct PeekABooSourceConcurrencyTests {
+struct PhotosLibraryCaptureSourceConcurrencyTests {
 
     // Verifies that captureFrame() throws immediately (not hangs) when called
     // while a capture is already in flight — P1-2 regression guard.
     @Test
     func captureFrameThrowsWhenAlreadyInFlight() async throws {
-        let source = PeekABooSource()
+        let source = PhotosLibraryCaptureSource()
 
         // Manually set captureInFlight by starting a task that will never resolve
         // We can't do this via the public API without a real Photos session, so

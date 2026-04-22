@@ -4,27 +4,22 @@ import QuartzCore
 import UIKit
 import Logging
 
-// MARK: - PeekABooSource
+// MARK: - PhotosLibraryCaptureSource
 
-/// `PassthroughCaptureSource` implementation backed by PeekABoo screenshot observation.
+/// `PassthroughCaptureSource` implementation backed by an internal PHPhotoLibraryChangeObserver.
 ///
-/// PeekABoo monitors the system screenshot album and calls back with the captured `UIImage`
+/// Observes the Photos library for new screenshots and calls back with the captured `UIImage`
 /// whenever the user presses Digital Crown + Capture Button.
 ///
-/// The source must be `@MainActor` because PeekABoo's `onCapture` closure runs on the
-/// main actor, and `UIImage` is not `Sendable`.
-///
-/// ## Usage
-///
-/// Attach `.onCapture { image in await source.handleCapture(image) }` to the root view
-/// of your capture-aware SwiftUI hierarchy **exactly once**.
+/// The source must be `@MainActor` because handleCapture is called via a Task hop from the
+/// PhotoKit background queue, and `UIImage` is not `Sendable`.
 ///
 /// ## Lifecycle
 ///
 /// Call `start()` after Photos authorization is granted. Call `stop()` to cancel pending
 /// captures and drain the frame stream.
 @MainActor
-public final class PeekABooSource: PassthroughCaptureSource {
+public final class PhotosLibraryCaptureSource: PassthroughCaptureSource {
 
     // MARK: - Private state
 
@@ -150,9 +145,9 @@ public final class PeekABooSource: PassthroughCaptureSource {
         }
     }
 
-    // MARK: - Capture handler (called from SwiftUI .onCapture modifier)
+    // MARK: - Capture handler (called by ScreenshotObserver)
 
-    /// Called by the SwiftUI view that hosts the `.onCapture` modifier.
+    /// Called by ScreenshotObserver on the main actor via Task hop.
     ///
     /// Records delivery timestamp immediately on entry, then fetches the
     /// corresponding `PHAsset` to obtain the authoritative shutter timestamp.
@@ -161,7 +156,7 @@ public final class PeekABooSource: PassthroughCaptureSource {
         let deliveryTimestamp = Date()
         logger.info("capture.delivered — at: \(deliveryTimestamp.timeIntervalSince1970)")
 
-        // Guard against zero-size images (PeekABoo swallows errors internally)
+        // Guard against zero-size images
         guard image.size != .zero else {
             logger.warning("capture.failed — reason: zeroSizeImage")
             return
@@ -221,7 +216,7 @@ public final class PeekABooSource: PassthroughCaptureSource {
             // Caller (SwiftUI view) posts the accessibility announcement
             // We signal via notification name so the view layer can react
             NotificationCenter.default.post(
-                name: PeekABooSource.firstCaptureNotification, object: nil
+                name: PhotosLibraryCaptureSource.firstCaptureNotification, object: nil
             )
         }
 
@@ -237,8 +232,8 @@ public final class PeekABooSource: PassthroughCaptureSource {
 
     // MARK: - Authorization
 
-    /// Requests Full Photos access. Returns `false` for `.limited` — PeekABoo
-    /// requires `.authorized` to observe screenshots.
+    /// Requests Full Photos access. Returns `false` for `.limited` —
+    /// Full access required; .limited is insufficient for screenshot monitoring.
     @discardableResult
     public func requestPhotoLibraryAccess() async -> Bool {
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
@@ -268,10 +263,10 @@ public final class PeekABooSource: PassthroughCaptureSource {
 // MARK: - ScreenshotObserver
 
 private final class ScreenshotObserver: NSObject, PHPhotoLibraryChangeObserver {
-    private weak var source: PeekABooSource?
+    private weak var source: PhotosLibraryCaptureSource?
     private var lastSeenLocalIdentifier: String?
 
-    init(source: PeekABooSource) {
+    init(source: PhotosLibraryCaptureSource) {
         self.source = source
     }
 

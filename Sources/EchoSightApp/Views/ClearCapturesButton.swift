@@ -124,7 +124,7 @@ struct AlbumCaptureObservingView: View {
     var body: some View {
         EmptyView()
             .onReceive(
-                NotificationCenter.default.publisher(for: PeekABooSource.firstCaptureNotification)
+                NotificationCenter.default.publisher(for: PhotosLibraryCaptureSource.firstCaptureNotification)
             ) { _ in
                 guard !hasAnnouncedFirstCapture else { return }
                 hasAnnouncedFirstCapture = true
