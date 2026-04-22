@@ -1,5 +1,32 @@
 # Progress Log
 
+## Session: 2026-04-22 (Phase 3 close-out)
+
+### Phase 3 review gate — ACCEPTED
+
+Per `workflow.md` `between_phases: review` — gate passed by user on 2026-04-22 after Sprint 3.2 merge (`c6131bc`). Gate-check evidence: build green (0 errors), Sprint 3.2 progress entry below, 5 Phase 3 specs marked `completed` in Spec Status table.
+
+### Gaps consciously accepted at gate
+
+Surfaced during post-merge verification and accepted rather than blocked:
+
+1. **Build warnings (3, new).** `xcodebuild -destination 'generic/platform=visionOS' build` exits 0 but reports:
+   - `ChimeRenderer.swift:67` — `playerNode.scheduleBuffer(buffer, completionHandler: nil)` has an async alternative (Swift 6 concurrency advisory).
+   - `SpatialRecallOrchestrator.swift:256` and `:346` — `SpeechToken` return value from `speakAction(...)` unused on two call sites (graceful-fallback + detail-speak paths).
+   - Sprint 3.2 commit log claims "0 errors, 0 warnings" — the errors count is accurate, the warnings count is not. Logged here for honesty; fix deferred to backlog as **S3.2-CLEANUP-1**.
+
+2. **`/test-review` not run.** 39 tests landed across 7 files (spec-required coverage written) but test-quality review was skipped by phase-runner. Tests themselves are also deferred from execution per visionOS-sim-boot policy. Net state: coverage written, not independently audited, not executed. Logged as **S3.2-CLEANUP-2**.
+
+3. **`/perf-review` not run.** Specs define latency budgets (chime ≤200 ms, recall gestalt ≤2 s p95, detail ≤800 ms after gestalt, silent-mid-flight cancel ≤100 ms). No synthetic-workload perf audit was performed. Code-review caught the two P0 perf bugs (temp URL reclamation race, 2 GB SHA blocking `@MainActor`) so the highest-severity perf issues were addressed through that channel. Remaining budget verification deferred to on-device instrumentation during BLV alpha. Logged as **S3.2-CLEANUP-3**.
+
+4. **`.orchestrate/code-review.md` committed now** for parity with `.orchestrate/hig-audit.md` (committed in `6622817`). Both review artifacts now tracked.
+
+### Phase 3 → Phase 4 readiness
+
+Phase 3 closed with all five specs (`annotation-store`, `gemma-enrichment`, `spatial-recall`, `ambient-announce`, `onboarding-download`) at status `completed`. All five of Sprint 3.1's deferred P2 items remain in backlog; all six Sprint 3.2 deferred items in backlog. Together with pre-existing Phase 1-2 carry-forwards, the backlog is the next housekeeping target before any Phase 4 work begins.
+
+---
+
 ## Session: 2026-04-22 (Sprint 3.2 execution)
 
 ### Sprint 3.2 — spatial-recall + ambient-announce + onboarding-download (Phase 3 Sprint 2) — merged c6131bc
