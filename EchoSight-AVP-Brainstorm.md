@@ -1,3 +1,5 @@
+> **Historical planning snapshot (2026-04-11).** Some decisions have since changed -- notably, PeekABoo was ditched in favor of an internal PhotosLibraryCaptureSource. See docs/plans/findings.md and docs/plans/progress.md for current state.
+
 # EchoSight on Apple Vision Pro — Brainstorm Document
 
 **Date:** 2026-04-11

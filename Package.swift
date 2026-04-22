@@ -1,4 +1,12 @@
 // swift-tools-version: 6.0
+//
+// This manifest describes EchoSightCore as a reusable Swift library.
+// The shipping visionOS app (EchoSightApp target, Info.plist, capabilities,
+// signing) is defined in project.yml via XcodeGen, which generates the
+// EchoSight.xcodeproj used for Xcode builds and TestFlight submissions.
+//
+// Scope of this file: Core's own dependencies (swift-log, GRDB, mlx-swift).
+// Do not add App-layer dependencies here -- add them to project.yml.
 import PackageDescription
 
 let package = Package(

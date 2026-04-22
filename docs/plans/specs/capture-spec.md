@@ -13,7 +13,7 @@ created: 2026-04-21
 
 ## Goal
 
-Deliver a working `PeekABoo`-backed `PassthroughCaptureSource` that produces time-stamped `CapturedFrame` records, manages a dedicated EchoSight Photos album, and surfaces a clear-captures UX. Single-gesture model for v0.1 (Feature 1 only).
+Deliver a working `PeekABoo`-backed `PassthroughCaptureSource` that produces time-stamped `CapturedFrame` records, manages a dedicated EchoSight Photos album, and surfaces a clear-captures UX. Single-gesture model for v0.1 (Feature 1 only). (Phase 4 Sprint 5 note: reimplemented internally; see docs/plans/specs/photos-library-capture-source-spec.md)
 
 ## Requirements
 
@@ -36,7 +36,7 @@ Deliver a working `PeekABoo`-backed `PassthroughCaptureSource` that produces tim
 
 ## Technical Approach
 
-PeekABoo ships as a Swift Package; integrate and wrap its `.onCapture { image, asset in ... }` closure. Maintain album identifier in `UserDefaults` after first creation. Since OS cannot silently delete screenshots, onboarding must disclose the pollution clearly before first capture.
+PeekABoo ships as a Swift Package; integrate and wrap its `.onCapture { image, asset in ... }` closure. Maintain album identifier in `UserDefaults` after first creation. Since OS cannot silently delete screenshots, onboarding must disclose the pollution clearly before first capture. (Phase 4 Sprint 5 note: reimplemented internally; see docs/plans/specs/photos-library-capture-source-spec.md)
 
 ## Files
 
