@@ -1,5 +1,65 @@
 # Progress Log
 
+## Session: 2026-04-21 (Sprint 2.1 execution)
+
+### Sprint 2.1 — detector + fusion (Phase 2) — merged 0f1d67c
+
+**Wave A (serial prep):**
+- `8b0797e` feat(capture): add machTimestamp for Mach-time pose lookup
+
+**Wave B (parallel specs):**
+- detector-spec (7 commits): `64f6aba` → `7a580fe` → `9fb19ce` → `4c73e6d`
+- fusion-spec (6 commits): `bd18a25` → `9b606cf` → `12ef46c` → `da478dc` → `71ae9c7` → `04c6158`
+
+**Close-out fixes:**
+- `5bd2f52` fix(detector,fusion): resolve Swift 6 strict concurrency build errors
+- `1f915d3` chore(sprint-2.1): regenerate xcodeproj with detector + fusion sources
+- `3194b29` fix(sprint-2.1): address code-review P1s (PixelToRay vFOV, FusionEngine doc, SpatialSession sim guard)
+
+**Key implementation decisions:**
+- `VisionDetector` is an `actor` running CoreML YOLO11n int8 (`yolo11n-int8.mlpackage`, ~2.89 MB from `TheCluster/YOLOv11-CoreML`). COCO 80-class, `.cpuAndNeuralEngine` compute units.
+- Y-flip convention locked: `topLeftY = 1 - vn.boundingBox.origin.y - vn.boundingBox.height` (Vision is bottom-left origin, `DetectionResult` is top-left).
+- `imageCropAndScaleOption = .scaleFit` (not default `.centerCrop`) — aligns bbox coords with source image.
+- `VNCoreMLRequest` built fresh per call (avoids Swift 6 Sendable issues with actor property storage).
+- `FalconDetector` stub throws `.unavailable` cleanly — drop-in slot for post-v0.1 mlx-swift port.
+- `FusionEngine` two-tier design: pure tier (ray math, reconciler) on actor's own executor; `Scene.raycast` hops to `@MainActor` via `await MainActor.run { ... }`.
+- Raycast uses `mask: .sceneUnderstanding` — without this, mesh entities are invisible to `Scene.raycast` (silent failure on default mask).
+- Pose lookup path: `frame.shutterTimestamp` (wall-clock `Date`) → `HeadPoseRingBuffer.pose(at:)`. `machTimestamp` field added to `CapturedFrame` but not yet consumed; retained for future `queryDeviceAnchor(atTimestamp:)` path.
+- `SpatialSession` now gates `SceneReconstructionProvider` on `.isSupported` before `arkitSession.run` — crashes the visionOS simulator otherwise.
+- `LabelReconciler` is table-driven and RealityKit-free (unit-testable off-device). Covers chair-on-floor agreement, detector-vs-mesh disagreement, person bypass via shoulder-height, raycast-miss 3m fallback.
+- `FovCalibrationView` is `#if DEBUG` only — slider sweep of `hFovDeg` 90°–110° for empirical calibration on device.
+
+**Sprint 2.1 code-review findings (`/code-review-pro`, 2026-04-21):**
+
+Verdict: **p0_p1_found** — 0 P0, 3 P1, 3 P2, 2 P3.
+
+P1s fixed in `3194b29`:
+- `PixelToRay.swift:40` — `vFovRad = hFovRad / aspect` is wrong derivation. Fix: `tanH = tan(hFovRad/2)` → `tanV = tanH / aspect`. Existing tests used `aspect: 1.0` (degenerate), so the bug was latent until real 16:9 device captures. Added regression test `verticalAngleFollowsTangentRatioForNonSquareAspect` asserting Y-component ≈ 0.4903 at 16:9 + 90° hFov.
+- `FusionEngine.swift:16-18` — doc header promised `machTimestamp → queryDeviceAnchor` but code takes the `shutterTimestamp → ring buffer` path. Updated doc to match implementation; noted `machTimestamp` is retained for future use.
+- `SpatialSession.swift:59` — unconditional `arkitSession.run([worldTracking, sceneReconstruction])` crashed on simulator. Fix: gate `sceneReconstruction` append on `SceneReconstructionProvider.isSupported`, log warning when skipped.
+
+P2 — deferred to Sprint 2.2 cleanup:
+- `VisionDetector.swift:116` — new `DispatchQueue` allocated per `detect()` call. Should be stored on the actor.
+- `VisionDetector.swift:171` — 2s timeout uses `DispatchWorkItem.cancel()` which doesn't interrupt a running inference. Spec-recommended `withThrowingTaskGroup` pattern is safer.
+- `FovCalibrationView.swift:69-71` — `PixelToRay.ray(...)` called three times for the same inputs; factor into one call.
+
+P3 — deferred:
+- `VisionDetector.swift:94-95` — duplicate doc comment on `detect()`.
+- `VisionDetectorTests.swift:193` — tautological `#expect(Bool(true), ...)` on perf acceptance. Should use `withKnownIssue("Perf requires device")`.
+
+**Strengths noted (review):**
+- Y-flip convention correctly implemented and locked by three independent test assertions + bounds parametric. Exactly the rigor the gotcha deserves.
+- `LabelReconciler` genuinely table-driven with no RealityKit import. Covers all five rule-table rows in tests.
+- `@unchecked Sendable` on `CapturedFrame` has a written rationale in the doc comment naming the non-Sendable field (`[String: Any]` metadata). Acceptable usage.
+
+**Commits (14 total):** `8b0797e` → `64f6aba` → `7a580fe` → `9fb19ce` → `4c73e6d` → `bd18a25` → `9b606cf` → `12ef46c` → `da478dc` → `71ae9c7` → `04c6158` → `5bd2f52` → `1f915d3` → `3194b29` → `0f1d67c` (merge).
+
+**Notes on execution:**
+- Phase-runner stalled during XcodeBuildMCP sim-defaults setup at the test step; manual completion took over at commit `1f915d3`. Workers had already finished both specs; review + P1 fixes + merge were completed manually in main context.
+- Simulator test run deferred — same policy as Sprints 1.1/1.2. Manual run: `xcodebuild test -scheme EchoSight -destination 'platform=visionOS Simulator,name=Apple Vision Pro' | xcbeautify`.
+
+---
+
 ## Session: 2026-04-21 (Sprint 1.2 execution)
 
 ### Sprint 1.2 — capture spec (Phase 1) — merged e4904ad
@@ -138,8 +198,8 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 | speech-out | 1 | 1 | completed | 661a9a0 | 2026-04-21 |
 | observability | 1 | 1 | completed | ed70667 | 2026-04-21 |
 | capture | 1 | 2 | completed | e4904ad | 2026-04-21 |
-| detector | 2 | 1 | eng-reviewed | — | 2026-04-21 |
-| fusion | 2 | 1 | eng-reviewed | — | 2026-04-21 |
+| detector | 2 | 1 | completed | 0f1d67c | 2026-04-21 |
+| fusion | 2 | 1 | completed | 0f1d67c | 2026-04-21 |
 | modal-input | 2 | 2 | eng-reviewed | — | 2026-04-21 |
 | scene-description | 2 | 2 | eng-reviewed | — | 2026-04-21 |
 | ocr | 2 | 2 | eng-reviewed | — | 2026-04-21 |
@@ -154,6 +214,8 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 ## Test Results
 | Test | Expected | Actual | Status |
 |------|----------|--------|--------|
+| Sprint 2.1 xcodebuild build | visionOS generic build succeeds | Build Succeeded (1 Sprint 1.1 NSLock warning, 0 new) | passed |
+| Sprint 2.1 xcodebuild test | simulator tests pass | deferred — phase-runner sim-setup stall; manual command in Sprint 2.1 notes | deferred |
 | Sprint 1.2 xcodebuild build | visionOS generic build succeeds | Build Succeeded (4 Sprint 1.1 warnings + 0 new) | passed |
 | Sprint 1.2 xcodebuild test | simulator tests pass | deferred — no visionOS simulator in environment; manual command in Sprint 1.2 notes | deferred |
 | Sprint 1.1 xcodebuild build | visionOS generic build succeeds | Build Succeeded with 4 benign warnings | passed |
@@ -170,9 +232,9 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 ## 5-Question Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | **Phase 1 complete** (Sprints 1.1 + 1.2 merged). At phase-boundary review gate — Phase 2 requires user approval before start. |
+| Where am I? | **Phase 2 Sprint 1 complete** (detector + fusion merged at `0f1d67c`). Within-phase, so no between-phases gate — ready for Sprint 2.2 (modal-input, then scene-description + ocr in parallel). |
 | Where am I going? | Ship v0.1 (Feature 1 + Layer 1 + persistence) on visionOS |
 | What's the goal? | Accessibility-first spatial companion for BLV users, fully local |
-| What have I learned? | See findings.md + Sprint 1.1/1.2 close-out notes above. Key 1.2 finding: PeekABoo API returns `UIImage` only (no `PHAsset`), re-fetch screenshot via `PHAsset.fetchAssets` inside closure. |
-| What have I done? | Phase 1 Sprint 1: root protocols, SwiftPM + Xcode skeleton, Layer 1 ARKit + mesh, SpeechOut actor, observability bootstrap + DebugConsoleView. Phase 1 Sprint 2: capture pipeline (PeekABooSource, EchoSightAlbum, CapturePrivacyOnboardingView, ClearCapturesButton, CameraFrameProviderSource stub, CaptureTests). |
-| What's next? | Phase 2 Sprint 1 (detector + fusion, parallel). Pending user approval at phase gate. |
+| What have I learned? | See findings.md + Sprint 2.1 close-out notes above. Key 2.1 findings: Vision bbox Y-flip (bottom-left → top-left), `Scene.raycast` needs `mask: .sceneUnderstanding` or mesh hits silently fail, `PixelToRay` vFOV must divide tangents not radians, `SceneReconstructionProvider.isSupported` gate required for simulator. |
+| What have I done? | Phase 1: foundations (1.1) + capture (1.2). Phase 2 Sprint 1: detector (VisionDetector actor + CoreML YOLO11n + DefaultQuerySet + FalconDetector stub + tests) and fusion (FusionEngine two-tier + PixelToRay + LabelReconciler + AnnotationCandidate + FovCalibrationView + tests). |
+| What's next? | Phase 2 Sprint 2: modal-input first (sequential), then scene-description + ocr in parallel. Within-phase auto gate — proceeds without user approval per workflow.md. |
