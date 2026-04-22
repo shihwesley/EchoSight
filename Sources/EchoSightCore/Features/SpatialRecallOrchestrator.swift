@@ -67,6 +67,7 @@ public actor SpatialRecallOrchestrator {
     // MARK: - Constants
 
     private enum Constants {
+        /// Production second-press window. Overridden via testability init for fast tests.
         static let windowDuration: TimeInterval = 5.0
         static let queryRadius: Float = 5.0
         static let maxDetailAnnotations = 5
@@ -81,6 +82,9 @@ public actor SpatialRecallOrchestrator {
     private let cancelAllAction: CancelAllAction
     private let headPoseProvider: HeadPoseProvider
     private let log = Logger(label: "echosight.recall")
+
+    /// The active window duration. Set via testability init to avoid 6-second test walls.
+    private let windowDuration: TimeInterval
 
     // MARK: - State
 
@@ -111,21 +115,28 @@ public actor SpatialRecallOrchestrator {
             await speechOut.cancelAll()
         }
         self.headPoseProvider = headPoseProvider
+        self.windowDuration = Constants.windowDuration
     }
 
     /// Testability init — accepts closure overrides for all I/O.
+    ///
+    /// - Parameter windowDuration: Override the 2-press window duration. Inject a short
+    ///   value (e.g. 0.1) in tests to avoid 6-second wall-clock waits. Defaults to the
+    ///   production value (5.0 s).
     public init(
         nearestAnnotations: @escaping NearestAnnotationsProvider,
         gemmaSummarize: @escaping GemmaSummarizer,
         speakAction: @escaping SpeakAction,
         cancelAllAction: @escaping CancelAllAction,
-        headPoseProvider: @escaping HeadPoseProvider
+        headPoseProvider: @escaping HeadPoseProvider,
+        windowDuration: TimeInterval = 5.0
     ) {
         self.nearestAnnotations = nearestAnnotations
         self.gemmaSummarize = gemmaSummarize
         self.speakAction = speakAction
         self.cancelAllAction = cancelAllAction
         self.headPoseProvider = headPoseProvider
+        self.windowDuration = windowDuration
     }
 
     // MARK: - Start / Stop
@@ -210,7 +221,7 @@ public actor SpatialRecallOrchestrator {
 
         case .awaitingSecondPress(let firstPressAt, let windowTask, let gestaltToken):
             let elapsed = timestamp.timeIntervalSince(firstPressAt)
-            if elapsed <= Constants.windowDuration {
+            if elapsed <= windowDuration {
                 windowTask.cancel()
                 log.info("recall.state.transition(from:to:)", metadata: [
                     "from": "awaitingSecondPress", "to": "speakingDetail",
@@ -267,9 +278,10 @@ public actor SpatialRecallOrchestrator {
         let gemmaMs = Int(Date().timeIntervalSince(gemmaStart) * 1000)
         log.info("recall.gemma.completed", metadata: ["durationMs": .string("\(gemmaMs)")])
 
-        // Start window timer BEFORE speaking so the 5 s is from press, not from TTS start.
+        // Start window timer BEFORE speaking so the window is from press, not from TTS start.
+        let duration = windowDuration
         let windowTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(Constants.windowDuration))
+            try? await Task.sleep(for: .seconds(duration))
             await self?.windowDidExpire()
         }
 

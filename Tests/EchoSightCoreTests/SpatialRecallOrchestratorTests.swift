@@ -34,7 +34,8 @@ struct SpatialRecallOrchestratorTests {
         annotations: [WorldAnnotation] = [],
         gemmaResult: Result<String, Error> = .success("Mock gestalt"),
         headPos: SIMD3<Float> = .zero,
-        speech: TestSpeech = TestSpeech()
+        speech: TestSpeech = TestSpeech(),
+        windowDuration: TimeInterval = 5.0
     ) -> (SpatialRecallOrchestrator, TestSpeech) {
         let orch = SpatialRecallOrchestrator(
             nearestAnnotations: { _, _ in annotations },
@@ -46,7 +47,8 @@ struct SpatialRecallOrchestratorTests {
                 return token
             },
             cancelAllAction: { await speech.recordCancelAll() },
-            headPoseProvider: { headPos }
+            headPoseProvider: { headPos },
+            windowDuration: windowDuration
         )
         return (orch, speech)
     }
@@ -167,17 +169,14 @@ struct SpatialRecallOrchestratorTests {
 
     @Test("Second press after window expiry is treated as new first press")
     func secondPressAfterWindowExpiry() async throws {
-        // Use a very short window by firing the event much later.
-        // Real window is 5 s but we can simulate expiry by checking behavior
-        // of fresh first press (both should yield gestalt).
-        // We verify: after enough time passes, a second press produces another gestalt (not detail).
-        // Note: This test intentionally takes ~6 s to run.
+        // Inject a 0.1 s window so the test completes in ~400 ms instead of ~6 s.
         let annotations = [makeAnnotation(label: "desk")]
         let speech = TestSpeech()
         let (orch, _) = makeOrchestrator(
             annotations: annotations,
             gemmaResult: .success("A workspace"),
-            speech: speech
+            speech: speech,
+            windowDuration: 0.1
         )
 
         let (firedStream, firedCont) = AsyncStream<ModeFiredEvent>.makeStream()
@@ -188,15 +187,15 @@ struct SpatialRecallOrchestratorTests {
         firedCont.yield(ModeFiredEvent(mode: .recall))
         try await Task.sleep(for: .milliseconds(100))
 
-        // Wait > 5 s to let the window expire
-        try await Task.sleep(for: .seconds(6))
+        // Wait > 0.1 s window to let it expire.
+        try await Task.sleep(for: .milliseconds(200))
 
-        // Second press — should be treated as fresh first press (new gestalt)
+        // Second press — should be treated as fresh first press (new gestalt).
         firedCont.yield(ModeFiredEvent(mode: .recall))
         try await Task.sleep(for: .milliseconds(100))
 
         let spoken = await speech.spoken
-        // Both presses should produce a gestalt (no detail)
+        // Both presses should produce a gestalt (no detail).
         #expect(spoken.count == 2)
         #expect(spoken[0].priority == .high)
         #expect(spoken[1].priority == .high)
@@ -233,12 +232,14 @@ struct SpatialRecallOrchestratorTests {
 
     @Test("Window expiry does not call cancelAll (pinned 2026-04-21)")
     func windowExpiryDoesNotCancelSpeech() async throws {
+        // Inject a 0.1 s window so the test completes in ~400 ms instead of ~6 s.
         let annotations = [makeAnnotation(label: "bookshelf")]
         let speech = TestSpeech()
         let (orch, _) = makeOrchestrator(
             annotations: annotations,
             gemmaResult: .success("A library area"),
-            speech: speech
+            speech: speech,
+            windowDuration: 0.1
         )
 
         let (firedStream, firedCont) = AsyncStream<ModeFiredEvent>.makeStream()
@@ -248,10 +249,10 @@ struct SpatialRecallOrchestratorTests {
         firedCont.yield(ModeFiredEvent(mode: .recall))
         try await Task.sleep(for: .milliseconds(100))
 
-        // Wait for window to expire (5 s + buffer)
-        try await Task.sleep(for: .seconds(6))
+        // Wait for the 0.1 s window to expire (with buffer).
+        try await Task.sleep(for: .milliseconds(300))
 
-        // cancelAll must NOT have been called (window expiry is not a speech-lifecycle event)
+        // cancelAll must NOT have been called (window expiry is not a speech-lifecycle event).
         let cancelCount = await speech.cancelAllCount
         #expect(cancelCount == 0)
     }
