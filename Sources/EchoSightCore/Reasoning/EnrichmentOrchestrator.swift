@@ -115,9 +115,15 @@ public actor EnrichmentOrchestrator {
                     "annotationId": .string(item.annotationId.uuidString),
                 ]
             )
+        } catch is CancellationError {
+            // Preemption is expected under normal queue operation — not an error.
+            log.info(
+                "gemma.enrichment.cancelled",
+                metadata: [
+                    "annotationId": .string(item.annotationId.uuidString),
+                ]
+            )
         } catch {
-            // P2-DEFERRED(Sprint 3.x): distinguish CancellationError (normal preemption) from
-            // real failures — preemptions should log at .debug, not .error.
             log.error(
                 "gemma.enrichment.failed",
                 metadata: [

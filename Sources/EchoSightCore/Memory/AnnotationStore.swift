@@ -157,26 +157,37 @@ public actor AnnotationStore {
 
     // MARK: - Read: WorldAnnotation
 
-    /// Loads all annotations attached to a given anchor UUID.
+    /// Returns all annotations attached to a given anchor UUID.
     ///
-    /// Also inserts any loaded annotations into the in-memory spatial hash
-    /// (used by `AnchorRehydrator` on `.rerecognized` events).
-    ///
-    /// P2-DEFERRED(Sprint 3.x): CQS violation — a method named `load` that also mutates
-    /// `spatialHash` is surprising at call sites. Split into `load` (pure read) and
-    /// `rehydrate` (read + hash update), with only `AnchorRehydrator` calling `rehydrate`.
-    public func load(worldAnchorId: UUID) throws -> [WorldAnnotation] {
+    /// Pure read — does not mutate the spatial hash. Use `rehydrate(worldAnchorId:)`
+    /// when you need to also warm the in-memory spatial index (e.g. on `.rerecognized`).
+    public func fetch(worldAnchorId: UUID) throws -> [WorldAnnotation] {
         let records = try dbQueue.read { db in
             try WorldAnnotationRecord.filter(
                 Column("worldAnchorId") == worldAnchorId.uuidString
             ).fetchAll(db)
         }
-        let annotations = records.compactMap { $0.toAnnotation() }
-        // Re-index into spatial hash (idempotent — SpatialHash.insert is a no-op on duplicate)
+        return records.compactMap { $0.toAnnotation() }
+    }
+
+    /// Returns all annotations attached to a given anchor UUID and re-indexes them
+    /// into the in-memory spatial hash.
+    ///
+    /// Call this on `.rerecognized` anchor events (via `AnchorRehydrator`). The hash
+    /// insert is idempotent — duplicate IDs are no-ops.
+    public func rehydrate(worldAnchorId: UUID) throws -> [WorldAnnotation] {
+        let annotations = try fetch(worldAnchorId: worldAnchorId)
         for a in annotations {
             spatialHash.insert(id: a.id, position: a.worldPosition)
         }
         return annotations
+    }
+
+    /// - Deprecated: Use `fetch(worldAnchorId:)` for a pure read or
+    ///   `rehydrate(worldAnchorId:)` when you also need the spatial hash warmed.
+    @available(*, deprecated, renamed: "rehydrate(worldAnchorId:)")
+    public func load(worldAnchorId: UUID) throws -> [WorldAnnotation] {
+        try rehydrate(worldAnchorId: worldAnchorId)
     }
 
     /// Returns annotations within `radius` meters of `headPose` using the spatial hash.

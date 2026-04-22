@@ -7,8 +7,8 @@ import Logging
 /// into the in-memory spatial hash when a previously-mapped anchor is re-recognized.
 ///
 /// Plumbing only — no user-facing output. On `.rerecognized`:
-///   1. Calls `AnnotationStore.load(worldAnchorId:)` to read SQLite rows
-///   2. `AnnotationStore.load` re-indexes results into the spatial hash
+///   1. Calls `AnnotationStore.rehydrate(worldAnchorId:)` to read SQLite rows
+///   2. `AnnotationStore.rehydrate` re-indexes results into the spatial hash
 ///   3. Marks `anchorId` as rehydrated so `isRehydrated(anchorId:)` returns `true`
 ///
 /// `.new` and `.sessionResumeRerecognized` events are ignored by this subscriber.
@@ -20,10 +20,18 @@ import Logging
 /// Observability: `echosight.store` log category.
 public actor AnchorRehydrator {
 
+    // MARK: - Configuration
+
+    /// Maximum rehydration attempts per anchor. Prevents infinite retry storms
+    /// on persistent DB errors (full disk, corruption). After this many failures
+    /// the anchor is silently skipped — user will not see stale recall data.
+    private static let maxRetries = 5
+
     // MARK: - Properties
 
     private let store: AnnotationStore
     private var rehydratedAnchors: Set<UUID> = []
+    private var failureCounts: [UUID: Int] = [:]
     private var streamTask: Task<Void, Never>?
     private let log = Logger(label: LogCategories.store)
 
@@ -64,12 +72,30 @@ public actor AnchorRehydrator {
         let anchorId = event.anchorId
         let hashedId = PrivacyFilter.hashAnchorId(anchorId)
 
-        log.info("store.rehydrate.started", metadata: ["anchorId": .string(hashedId)])
+        // Skip anchors that have exceeded the retry cap.
+        let currentFailures = failureCounts[anchorId, default: 0]
+        guard currentFailures < Self.maxRetries else {
+            log.error(
+                "store.rehydrate.skipped",
+                metadata: [
+                    "anchorId": .string(hashedId),
+                    "reason": "maxRetriesExceeded",
+                    "failureCount": .string("\(currentFailures)"),
+                ]
+            )
+            return
+        }
+
+        log.info("store.rehydrate.started", metadata: [
+            "anchorId": .string(hashedId),
+            "attempt": .string("\(currentFailures + 1)"),
+        ])
 
         let rehydrateStart = Date()
         do {
-            let annotations = try await store.load(worldAnchorId: anchorId)
+            let annotations = try await store.rehydrate(worldAnchorId: anchorId)
             rehydratedAnchors.insert(anchorId)
+            failureCounts.removeValue(forKey: anchorId)
 
             let durationMs = Int(Date().timeIntervalSince(rehydrateStart) * 1000)
             log.info(
@@ -81,15 +107,15 @@ public actor AnchorRehydrator {
                 ]
             )
         } catch {
-            // P2-DEFERRED(Sprint 3.x): failed rehydration should not permanently block retry.
-            // Currently isRehydrated() stays false (never inserted), so the next .rerecognized
-            // event will re-attempt — which is correct behaviour. The note here is to add an
-            // explicit retry-count cap to avoid infinite rehydration storms on persistent DB errors.
+            failureCounts[anchorId] = currentFailures + 1
+            let newCount = failureCounts[anchorId]!
             log.error(
                 "store.rehydrate.failed",
                 metadata: [
                     "anchorId": .string(hashedId),
                     "error": .string("\(error)"),
+                    "failureCount": .string("\(newCount)"),
+                    "retriesRemaining": .string("\(Self.maxRetries - newCount)"),
                 ]
             )
         }
@@ -105,10 +131,11 @@ public actor AnchorRehydrator {
         rehydratedAnchors.contains(anchorId)
     }
 
-    /// Clears the rehydrated-anchor set. Call on session interruption
-    /// so re-recognized anchors trigger a fresh load after session resume.
+    /// Clears the rehydrated-anchor set and failure counts. Call on session
+    /// interruption so re-recognized anchors trigger a fresh load after resume.
     public func reset() {
         rehydratedAnchors.removeAll()
+        failureCounts.removeAll()
         log.info("store.rehydrate.reset")
     }
 }

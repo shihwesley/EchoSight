@@ -14,7 +14,15 @@ public enum SummarizePromptBuilder {
 
     // MARK: - Build
 
-    public static func buildPrompt(from annotations: [WorldAnnotation]) -> String {
+    /// - Parameters:
+    ///   - annotations: Nearby world annotations to summarise.
+    ///   - headPose: Current head position in world space. Distances are measured
+    ///     from this point for user-relative semantics. Defaults to origin when
+    ///     the caller cannot provide a pose (e.g. in tests).
+    public static func buildPrompt(
+        from annotations: [WorldAnnotation],
+        headPose: SIMD3<Float> = .zero
+    ) -> String {
         guard !annotations.isEmpty else {
             return """
             The user is in an area with no remembered objects nearby.
@@ -23,10 +31,7 @@ public enum SummarizePromptBuilder {
         }
 
         let items = annotations.prefix(8).map { annotation -> String in
-            // P2-DEFERRED(Sprint 3.x): distance is from world origin (0,0,0), not head pose.
-            // Fix: add headPose: SIMD3<Float> parameter to buildPrompt and use
-            // simd_distance(annotation.worldPosition, headPose). Spatial-recall must thread it in.
-            let dist = simd_length(annotation.worldPosition)
+            let dist = simd_distance(annotation.worldPosition, headPose)
             let direction = cardinalDirection(from: annotation.worldPosition)
             return "\(annotation.falconLabel) \(String(format: "%.1f", dist))m \(direction)"
         }.joined(separator: ", ")

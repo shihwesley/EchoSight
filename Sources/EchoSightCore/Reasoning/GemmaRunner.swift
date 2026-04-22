@@ -100,11 +100,16 @@ public actor GemmaRunner {
     ///
     /// Snapshot: `annotations` array is copied at call entry.
     ///
-    /// - Parameter annotations: Immutable snapshot of nearby world annotations.
+    /// - Parameters:
+    ///   - annotations: Immutable snapshot of nearby world annotations.
+    ///   - headPose: Current head position in world space for user-relative distances.
     /// - Returns: A 1-sentence gestalt description.
-    public func summarize(annotations: [WorldAnnotation]) async throws -> String {
+    public func summarize(
+        annotations: [WorldAnnotation],
+        headPose: SIMD3<Float> = .zero
+    ) async throws -> String {
         let snapshot = Array(annotations)  // snapshot pin
-        let prompt = SummarizePromptBuilder.buildPrompt(from: snapshot)
+        let prompt = SummarizePromptBuilder.buildPrompt(from: snapshot, headPose: headPose)
         return try await queue.submit(
             prompt: prompt,
             maxTokens: TokenBudget.summarize,
