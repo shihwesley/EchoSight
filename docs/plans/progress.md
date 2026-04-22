@@ -1,5 +1,25 @@
 # Progress Log
 
+## Session: 2026-04-22 (Sprint 4.5 planning)
+
+### Sprint 4.5 — photos-library-capture-source
+
+Added after the PeekABoo integration audit surfaced two coupled problems:
+
+1. **Latent capture-flow bug.** `PeekABooSource.handleCapture(_:)` has zero callers in the codebase. The documented `.onCapture { image in ... }` SwiftUI modifier was never attached to any view. Despite `capture` spec being marked `completed` in Phase 1 Sprint 2, the v0.1 scene-description flow cannot actually run end-to-end from a screenshot gesture — the screenshot never reaches the pipeline. Existing `CaptureTests.swift` calls `handleCapture` directly from tests, bypassing the real runtime path — exactly the pattern `/test-review` would flag as "tests pass but the feature doesn't ship working." This missed detection because Phase 1 Sprint 2 close-out didn't include end-to-end runtime validation.
+
+2. **PeekABoo dependency provides near-zero value.** The only active PeekABoo API call is `PeekABoo.requestAccess()` at one call site. The `.onCapture` modifier (PeekABoo's other public API) is not attached anywhere. We pay the supply-chain cost for a benefit we don't collect.
+
+**Sprint 4.5 scope:** remove the PeekABoo SPM dependency, reimplement the screenshot observation internally via `PHPhotoLibraryChangeObserver` (which actually wires the flow for the first time), rename `PeekABooSource` → `PhotosLibraryCaptureSource`, add README credit for the mechanism inspiration, and cleanup Package.swift / project.yml confusion via option X (explanatory comment on Package.swift).
+
+**Bookkeeping fixup carried in this commit:** `backlog-pre-existing-warnings` Spec Files row was left at `eng-reviewed` in manifest.md by the Sprint 4.4 phase-runner close-out (the progress.md Spec Status table got `completed | 39c9ddc` but the manifest Spec Files row didn't). Corrected to `completed` here.
+
+**Review pipeline for Sprint 4.5:** skipped CEO/Eng/TLA. Removal of a third-party dep + wiring an observer is mechanical + well-understood; no new architecture. Spec marked `eng-reviewed` on authorship.
+
+**Manifest updates:** Phase/Sprint Map +1 row, Spec Files +1 row, total specs 20 → 21.
+
+---
+
 ## Session: 2026-04-22 (Sprint 4.4 execution)
 
 ### Sprint 4.4 — backlog-pre-existing-warnings — merged 39c9ddc
@@ -655,6 +675,7 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 | backlog-hig-warnings | 4 | 2 | completed | 1b15225 | 2026-04-22 |
 | quality-audits | 4 | 3 | completed | 36ee359 | 2026-04-22 |
 | backlog-pre-existing-warnings | 4 | 4 | completed | 39c9ddc | 2026-04-22 |
+| photos-library-capture-source | 4 | 5 | eng-reviewed | — | 2026-04-22 |
 
 <!-- Status values: draft → ceo-reviewed → eng-reviewed → in_progress → completed | blocked | skipped -->
 
