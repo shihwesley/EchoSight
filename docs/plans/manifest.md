@@ -101,6 +101,9 @@ graph TD
 | 2 | 2 | modal-input, scene-description, ocr | yes (modal-input first, then scene + ocr parallel) |
 | 3 | 1 | annotation-store, gemma-enrichment | partial (gemma needs annotation API) |
 | 3 | 2 | spatial-recall, ambient-announce, onboarding-download | partial (recall + ambient parallel; onboarding last) |
+| 4 | 1 | backlog-codereview | no (single consolidation spec) |
+| 4 | 2 | backlog-hig-warnings | no (single consolidation spec) |
+| 4 | 3 | quality-audits | no (single consolidation spec) |
 
 ## Spec Files
 
@@ -122,8 +125,11 @@ graph TD
 | spatial-recall | specs/spatial-recall-spec.md | 3 | 2 | completed | 200 | Recall state machine (owns 2-press timer) |
 | ambient-announce | specs/ambient-announce-spec.md | 3 | 2 | completed | 240 | Passive announce (idle = gesture + head-motion) |
 | onboarding-download | specs/onboarding-download-spec.md | 3 | 2 | completed | 190 | 2.6 GB download + non-gating tutorial + diagnostic |
+| backlog-codereview | specs/backlog-codereview-spec.md | 4 | 1 | eng-reviewed | 150 | Phase 1–3 P2/P3 code-review backlog cleanup (23 items) |
+| backlog-hig-warnings | specs/backlog-hig-warnings-spec.md | 4 | 2 | eng-reviewed | 110 | HIG P2/P3 deferrals + Sprint 3.2 build-warning cleanup |
+| quality-audits | specs/quality-audits-spec.md | 4 | 3 | eng-reviewed | 120 | /test-review + /perf-review + P0/P1 audit fixes |
 
-Total specs: **16** (was 14 after CEO, 10 originally). New specs from eng review: speech-out, observability.
+Total specs: **19** (16 feature specs across Phases 1–3 + 3 housekeeping specs in Phase 4). New specs from eng review: speech-out, observability. New specs from Phase 4 planning (2026-04-22): backlog-codereview, backlog-hig-warnings, quality-audits.
 
 ## Success Criteria (v0.1)
 

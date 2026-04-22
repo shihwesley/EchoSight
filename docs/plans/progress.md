@@ -1,5 +1,21 @@
 # Progress Log
 
+## Session: 2026-04-22 (Phase 4 planning)
+
+### Phase 4 scope — pre-release housekeeping
+
+Phase 4 added to manifest after user confirmed the backlog-burn-down interpretation of "continue on phase 4". Three sprints, sequential per `workflow.md` `between_phases: review`:
+
+- **Sprint 4.1** — `backlog-codereview` — 23 P2/P3 items from Sprints 1.1, 2.1, 2.2, 3.1, 3.2 (Sprint 2.1 P2#2 VisionDetector timeout rewrite accepted as "won't fix" per `progress.md:173` rationale).
+- **Sprint 4.2** — `backlog-hig-warnings` — 3 HIG P2/P3 deferrals + 3 build warnings (S3.2-CLEANUP-1).
+- **Sprint 4.3** — `quality-audits` — `/test-review` on Sprint 3.2's 39 tests + `/perf-review` vs 6 latency budgets + fix any P0/P1 findings.
+
+**Review pipeline for Phase 4:** skipped `/plan-ceo-review` (no scope decisions), skipped heavy `/plan-eng-review` (no new architecture), skipped `/tla-spec` (no new state machines). Spec files marked `eng-reviewed` on authorship because contents are references to already-reviewed commits + line numbers, not new designs.
+
+**Manifest updates:** Phase/Sprint Map gained 3 rows; Spec Files table gained 3 rows; total specs 16 → 19.
+
+---
+
 ## Session: 2026-04-22 (Phase 3 close-out)
 
 ### Phase 3 review gate — ACCEPTED
@@ -440,6 +456,9 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 | spatial-recall | 3 | 2 | completed | c6131bc | 2026-04-22 |
 | ambient-announce | 3 | 2 | completed | c6131bc | 2026-04-22 |
 | onboarding-download | 3 | 2 | completed | c6131bc | 2026-04-22 |
+| backlog-codereview | 4 | 1 | eng-reviewed | — | 2026-04-22 |
+| backlog-hig-warnings | 4 | 2 | eng-reviewed | — | 2026-04-22 |
+| quality-audits | 4 | 3 | eng-reviewed | — | 2026-04-22 |
 
 <!-- Status values: draft → ceo-reviewed → eng-reviewed → in_progress → completed | blocked | skipped -->
 
