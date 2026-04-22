@@ -36,6 +36,7 @@ public final class PeekABooSource: PassthroughCaptureSource {
     private var firstCaptureAnnouncedThisSession = false
     /// Prevents two concurrent `captureFrame()` callers from racing on the shared stream.
     private var captureInFlight = false
+    private var screenshotObserver: ScreenshotObserver?
 
     /// 800 ms capture timeout per spec acceptance criterion.
     private let captureTimeoutSeconds: Double = 0.8
@@ -66,6 +67,9 @@ public final class PeekABooSource: PassthroughCaptureSource {
         switch PHPhotoLibrary.authorizationStatus(for: .readWrite) {
         case .authorized:
             _isActive = true
+            let observer = ScreenshotObserver(source: self)
+            screenshotObserver = observer
+            PHPhotoLibrary.shared().register(observer)
             logger.info("capture.started")
         case .limited:
             logger.warning("capture.degraded — reason: limitedAccess")
@@ -93,6 +97,10 @@ public final class PeekABooSource: PassthroughCaptureSource {
 
     public func stop() async {
         _isActive = false
+        if let observer = screenshotObserver {
+            PHPhotoLibrary.shared().unregisterChangeObserver(observer)
+            screenshotObserver = nil
+        }
         framesContinuation?.finish()
         logger.info("capture.stopped")
     }
@@ -255,4 +263,42 @@ public final class PeekABooSource: PassthroughCaptureSource {
     /// Posted after the first capture of a session so the UI layer can announce
     /// the album reminder to VoiceOver.
     public static let firstCaptureNotification = Notification.Name("EchoSight.firstCapture")
+}
+
+// MARK: - ScreenshotObserver
+
+private final class ScreenshotObserver: NSObject, PHPhotoLibraryChangeObserver {
+    private weak var source: PeekABooSource?
+    private var lastSeenLocalIdentifier: String?
+
+    init(source: PeekABooSource) {
+        self.source = source
+    }
+
+    func photoLibraryDidChange(_ changeInstance: PHChange) {
+        let options = PHFetchOptions()
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        options.fetchLimit = 1
+        options.predicate = NSPredicate(
+            format: "mediaSubtype == %d", PHAssetMediaSubtype.photoScreenshot.rawValue
+        )
+        let result = PHAsset.fetchAssets(with: .image, options: options)
+        guard let asset = result.firstObject else { return }
+        guard asset.localIdentifier != lastSeenLocalIdentifier else { return }
+        lastSeenLocalIdentifier = asset.localIdentifier
+
+        let manager = PHImageManager.default()
+        let requestOptions = PHImageRequestOptions()
+        requestOptions.deliveryMode = .highQualityFormat
+        requestOptions.isSynchronous = false
+        manager.requestImage(
+            for: asset,
+            targetSize: PHImageManagerMaximumSize,
+            contentMode: .default,
+            options: requestOptions
+        ) { [weak self] image, _ in
+            guard let self, let image, let source = self.source else { return }
+            Task { @MainActor in await source.handleCapture(image) }
+        }
+    }
 }
