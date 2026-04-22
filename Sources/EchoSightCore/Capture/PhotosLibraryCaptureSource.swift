@@ -64,6 +64,10 @@ public final class PhotosLibraryCaptureSource: PassthroughCaptureSource {
             _isActive = true
             let observer = ScreenshotObserver(source: self)
             screenshotObserver = observer
+            observer.setupFetchResult()
+            // Seed the observer with the current latest screenshot so the first
+            // change notification does not replay a pre-existing screenshot.
+            observer.seed(with: observer.cachedFetchResult?.firstObject?.localIdentifier)
             PHPhotoLibrary.shared().register(observer)
             logger.info("capture.started")
         case .limited:
@@ -265,23 +269,56 @@ public final class PhotosLibraryCaptureSource: PassthroughCaptureSource {
 private final class ScreenshotObserver: NSObject, PHPhotoLibraryChangeObserver {
     private weak var source: PhotosLibraryCaptureSource?
     private var lastSeenLocalIdentifier: String?
+    var cachedFetchResult: PHFetchResult<PHAsset>?
 
     init(source: PhotosLibraryCaptureSource) {
         self.source = source
     }
 
-    func photoLibraryDidChange(_ changeInstance: PHChange) {
+    func seed(with identifier: String?) {
+        lastSeenLocalIdentifier = identifier
+    }
+
+    func setupFetchResult() {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.fetchLimit = 1
         options.predicate = NSPredicate(
-            format: "mediaSubtype == %d", PHAssetMediaSubtype.photoScreenshot.rawValue
+            format: "(mediaSubtype & %d) != 0", PHAssetMediaSubtype.photoScreenshot.rawValue
+        )
+        cachedFetchResult = PHAsset.fetchAssets(with: .image, options: options)
+    }
+
+    func photoLibraryDidChange(_ changeInstance: PHChange) {
+        // Fast path: if we have a cached result, check if screenshots changed
+        if let current = cachedFetchResult,
+           let details = changeInstance.changeDetails(for: current) {
+            cachedFetchResult = details.fetchResultAfterChanges
+            // Only proceed if something was inserted
+            guard !details.insertedObjects.isEmpty,
+                  let asset = details.fetchResultAfterChanges.firstObject else { return }
+            guard asset.localIdentifier != lastSeenLocalIdentifier else { return }
+            lastSeenLocalIdentifier = asset.localIdentifier
+            deliverImage(for: asset)
+            return
+        }
+
+        // Fallback path: no cached result yet, do a direct fetch
+        let options = PHFetchOptions()
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        options.fetchLimit = 1
+        options.predicate = NSPredicate(
+            format: "(mediaSubtype & %d) != 0", PHAssetMediaSubtype.photoScreenshot.rawValue
         )
         let result = PHAsset.fetchAssets(with: .image, options: options)
+        cachedFetchResult = result
         guard let asset = result.firstObject else { return }
         guard asset.localIdentifier != lastSeenLocalIdentifier else { return }
         lastSeenLocalIdentifier = asset.localIdentifier
+        deliverImage(for: asset)
+    }
 
+    private func deliverImage(for asset: PHAsset) {
         let manager = PHImageManager.default()
         let requestOptions = PHImageRequestOptions()
         requestOptions.deliveryMode = .highQualityFormat
