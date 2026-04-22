@@ -17,9 +17,10 @@ public enum ObservabilityBootstrap {
 
     // MARK: - State
 
-    // nonisolated(unsafe) is the Swift 6 idiom for mutable statics protected
-    // by an explicit lock. The NSLock below is the actual synchronization.
-    private nonisolated(unsafe) static let installLock = NSLock()
+    // NSLock is Sendable (final class with internal sync primitives), so it
+    // doesn't need `nonisolated(unsafe)`. The mutable `installed` flag does —
+    // it's protected by `installLock` below.
+    private static let installLock = NSLock()
     private nonisolated(unsafe) static var installed = false
 
     // MARK: - Public API
