@@ -37,15 +37,18 @@ public enum PixelToRay {
         }
 
         let hFovRad = hFovDeg * .pi / 180.0
-        let vFovRad = hFovRad / aspect  // rectilinear approximation
+        // Rectilinear derivation: vertical FOV follows from dividing tangents,
+        // not radians. tan(vFov/2) = tan(hFov/2) / aspect.
+        let tanH = tan(hFovRad / 2.0)
+        let tanV = tanH / aspect
 
         // Center-relative normalized device coords
         let cx: Float = nx - 0.5            // [-0.5, 0.5], +X = right
         let cy: Float = 0.5 - ny            // [-0.5, 0.5], +Y = up (screen Y is down)
 
         // Ray in head-local space (-Z forward, right-handed)
-        let x = cx * 2.0 * tan(hFovRad / 2.0)
-        let y = cy * 2.0 * tan(vFovRad / 2.0)
+        let x = cx * 2.0 * tanH
+        let y = cy * 2.0 * tanV
         let z: Float = -1.0
 
         let raw = SIMD3<Float>(x, y, z)

@@ -66,6 +66,23 @@ struct PixelToRayTests {
         #expect(angleDeg >= 44.0, "Corner angle should be ≥ 44° for 90° FOV, got \(angleDeg)°")
     }
 
+    /// At 16:9 aspect with 90° hFov, the top-edge ray's vertical angle must follow
+    /// `tanV = tanH / aspect`, not `vFov = hFov / aspect` (a prior bug that zeroed
+    /// out for square frames but under-tilted on real device captures).
+    @Test
+    func verticalAngleFollowsTangentRatioForNonSquareAspect() {
+        let topEdge = PixelToRay.ray(nx: 0.5, ny: 0.0, hFovDeg: 90, aspect: 16.0 / 9.0)
+
+        // Expected: tanH = tan(45°) = 1.0 → tanV = 1.0 / (16/9) = 0.5625
+        // Top-edge angle from -Z center = atan(tanV) ≈ 29.358°
+        // Y component of unit ray = sin(29.358°) ≈ 0.4903
+        let expectedY: Float = 0.4903
+
+        #expect(topEdge.y > 0, "Top-edge ray should point upward (+Y)")
+        #expect(abs(topEdge.y - expectedY) < 0.01,
+                "Top-edge Y should be ≈ \(expectedY) for 16:9 + 90° hFov, got \(topEdge.y)")
+    }
+
     /// Result must be a unit vector (length ≈ 1.0).
     @Test
     func outputIsUnitVector() {

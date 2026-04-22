@@ -13,9 +13,11 @@ import simd
 /// - RealityKit tier (main actor): `Scene.raycast` — required because `RealityKit.Scene`
 ///   is `@MainActor @preconcurrency` on visionOS 2.
 ///
-/// **Clock domains:**
-/// - `frame.machTimestamp` → `WorldTrackingProvider.queryDeviceAnchor(atTimestamp:)` (Mach time)
-/// - `frame.shutterTimestamp` → `HeadPoseRingBuffer.pose(at:)` (wall-clock Date)
+/// **Pose lookup:** `frame.shutterTimestamp` (wall-clock `Date`) is passed to
+/// `HeadPoseRingBuffer.pose(at:)`, which interpolates against poses recorded by
+/// `SpatialSession` in the same Date domain. `frame.machTimestamp` is retained
+/// on `CapturedFrame` for future `WorldTrackingProvider.queryDeviceAnchor(atTimestamp:)`
+/// use but is not consumed by the current ring-buffer path.
 ///
 /// **Simulator guard:** `Scene.raycast` requires a populated mesh. When `scene` is nil
 /// (simulator, unit tests) or mesh is empty, fusion falls back to the 3 m default distance.
