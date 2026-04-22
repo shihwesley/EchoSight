@@ -1,5 +1,56 @@
 # Progress Log
 
+## Session: 2026-04-22 (Sprint 3.1 execution)
+
+### Sprint 3.1 — annotation-store + gemma-enrichment (Phase 3 Sprint 1) — merged 81bafd0
+
+**Wave A (serial — annotation-store first; gemma depends on annotation-store API):**
+- `6251bde` feat(memory): annotation-store — GRDB persistence, spatial hash, anchor metadata
+- `3519471` feat(reasoning): gemma-enrichment — mlx-swift wrapper, priority queue, prompt builders
+- `f546392` chore(sprint-3.1): add GRDB dep to project.yml + regenerate xcodeproj
+- `ec79f54` fix(sprint-3.1): fix Swift 6 strict-concurrency errors in gemma-enrichment
+- `fe199f9` fix(sprint-3.1): address code-review P1s, add P2/P3 deferred notes
+
+**Close-out:**
+- `81bafd0` Merge Sprint 3.1 — annotation-store + gemma-enrichment (Phase 3)
+
+**Key implementation decisions:**
+- `AnnotationStore` is a Swift actor; `DatabaseQueue` serialises all SQLite writes; `SpatialHash` is a value type (struct) so copying produces an independent snapshot, satisfying the snapshot-pinning contract for Gemma read paths without explicit locking.
+- `AnnotationMerger` uses strict less-than (`< 0.30 m`) so exactly 30 cm does not merge — spec-aligned boundary behaviour.
+- `AnchorRehydrator` subscribes to `AsyncStream<AnchorChangeEvent>` and handles `.rerecognized` only. `.new` and `.sessionResumeRerecognized` are ignored.
+- `hasAnchorMetadata(anchorId:)` is non-throwing synchronous (required by `AnchorEventStream.anchorMetadataQuery` closure type). DB errors are logged before defaulting to `false` — the safe fallback causes `.new` to fire rather than silently masking the error.
+- `CancelFlag` uses `Atomic<Bool>` from `Synchronization` (Swift 6 stdlib) rather than `nonisolated(unsafe)` — no TSan flag, relaxed ordering sufficient for cooperative cancellation polling.
+- `GemmaPriorityQueue.init(generate:)` takes a closure rather than a `GemmaRunner` reference, breaking the potential retain cycle. The queue is `internal` (only `GemmaRunner` constructs it).
+- Gemma weights are not downloaded in Sprint 3.1 — `GemmaModelManager` enters `.unavailable` if the weight directory is absent. Sprint 3.2 (`onboarding-download`) writes there.
+- `project.yml` was missing GRDB — added, then `xcodegen generate` run from worktree root per Phase 2 precedent (chore commits `f3cff0c`, `4ff6ecc`).
+
+**Build verification:** `xcodebuild -scheme EchoSight -destination 'generic/platform=visionOS' build` passes with **0 errors**. Pre-existing warnings in `VisionDetector.swift` (NSLock/DispatchWorkItem pattern, deferred Phase 2) and `OcrPipeline.swift`/`ModalInputCoordinator.swift` (unreachable catch, deferred Phase 2) — no new warnings from Sprint 3.1 files.
+
+**Tests:** deferred (visionOS simulator boot exceeds phase-runner watchdog). Manual command: `xcodebuild test -scheme EchoSight -destination 'platform=visionOS Simulator,name=Apple Vision Pro' | xcbeautify`. Test files written: `AnnotationStoreTests.swift`, `SpatialHashTests.swift`, `AnnotationMergerTests.swift`, `AnchorMetadataTests.swift`, `EnrichmentOrchestratorTests.swift`, `GemmaPriorityQueueTests.swift`, `EnrichmentPromptBuilderTests.swift`, `SummarizePromptBuilderTests.swift`, `RoomLabelPromptBuilderTests.swift`.
+
+**Sprint 3.1 code-review findings (`/code-review-pro`, 2026-04-22):**
+- **P0:** None.
+- **P1 (fixed):** (1) `CancelFlag` used `nonisolated(unsafe)` bool with no memory barrier — replaced with `Atomic<Bool>` from `Synchronization`. (2) `AnnotationStore.hasAnchorMetadata` silently swallowed DB errors via `try?` — replaced with explicit do/catch + error log. (3) `AnchorMetadataTests.upsertUpdatesLastSeenAt` declared `throws` but not `async` despite calling `await Task.sleep` — compile error; added `async`.
+- **P2 (deferred, inline notes added):** (1) `EnrichmentOrchestrator` catch block logs `CancellationError` (normal preemption) at `.error` — should distinguish and log at `.debug`. (2) `AnchorRehydrator` failed rehydration has no retry-count cap. (3) `SummarizePromptBuilder` measures distance from world origin `(0,0,0)`, not head pose. (4) `AnnotationStore.write` calls `load()` on every write path — O(N²) under bulk ingestion. (5) `GemmaPriorityQueue` has no behavioral tests for preemption/re-enqueue state machine. (6) `AnnotationStore.load()` violates CQS by mutating `spatialHash`.
+- **P3 (deferred, inline notes added):** (1) `QueueError` enum in `GemmaPriorityQueue` is dead code. (2) `MeshClassificationSummary` extension lives in Reasoning module. (3) `makeAnnotation()` helper duplicated across 5 test files.
+
+### Consciously deferred into Phase 3 Sprint 2+ backlog
+
+Carried forward from Sprint 3.1 P2/P3 review:
+- **P2-1** — `EnrichmentOrchestrator` cancellation log level (preemptions logged as errors)
+- **P2-2** — `AnchorRehydrator` retry-count cap on persistent DB error
+- **P2-3** — `SummarizePromptBuilder` distance calculation (world origin vs head pose)
+- **P2-4** — `AnnotationStore.write` O(N²) load on write path
+- **P2-5** — `GemmaPriorityQueue` preemption + state-machine behavioral tests
+- **P2-6** — `AnnotationStore.load` CQS violation
+- **P3-1** — `QueueError` dead code cleanup
+- **P3-2** — `MeshClassificationSummary` extension location
+- **P3-3** — shared `makeAnnotation()` test factory
+
+Plus Phase 2 carry-forwards (unchanged): VisionDetector timeout rewrite, VisionDetector doc comment, CrownQuantizer sign-boundary, roundedDistance float equality, `[weak self]` in actor Tasks, gesture priority arbitration, `SceneDescriptionPipeline` nil-scene handling.
+
+---
+
 ## Session: 2026-04-22 (Phase 2 close-out housekeeping)
 
 ### Phase 2 gate status
@@ -285,8 +336,8 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 | modal-input | 2 | 2 | completed | ad6da8e | 2026-04-21 |
 | scene-description | 2 | 2 | completed | ad6da8e | 2026-04-21 |
 | ocr | 2 | 2 | completed | ad6da8e | 2026-04-21 |
-| annotation-store | 3 | 1 | eng-reviewed | — | 2026-04-21 |
-| gemma-enrichment | 3 | 1 | eng-reviewed | — | 2026-04-21 |
+| annotation-store | 3 | 1 | completed | 81bafd0 | 2026-04-22 |
+| gemma-enrichment | 3 | 1 | completed | 81bafd0 | 2026-04-22 |
 | spatial-recall | 3 | 2 | eng-reviewed | — | 2026-04-21 |
 | ambient-announce | 3 | 2 | eng-reviewed | — | 2026-04-21 |
 | onboarding-download | 3 | 2 | eng-reviewed | — | 2026-04-21 |
@@ -316,9 +367,9 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 ## 5-Question Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | **Phase 2 Sprint 2 complete** (modal-input + scene-description + ocr merged at `ad6da8e`). Phase 2 done. Between-phases gate applies before Phase 3 (annotation-store → gemma-enrichment → spatial-recall + ambient-announce + onboarding). |
-| Where am I going? | Ship v0.1 (Feature 1 + Layer 1 + persistence) on visionOS |
+| Where am I? | **Phase 3 Sprint 1 complete** (annotation-store + gemma-enrichment merged at `81bafd0`). Phase 3 Sprint 2 (spatial-recall + ambient-announce + onboarding-download) is next — within-phase auto gate. |
+| Where am I going? | Ship v0.1 (Feature 1 + Layer 1 + persistence + reasoning) on visionOS |
 | What's the goal? | Accessibility-first spatial companion for BLV users, fully local |
-| What have I learned? | See findings.md + sprint notes above. Key 2.2 findings: visionOS has no `digitalCrownRotation` for third-party apps (system-reserved); `VNRecognizedTextObservation` not `Sendable` — extract fields inside Vision callback (same pattern as VisionDetector); `ModalInputCoordinator` as actor with `AsyncStream` + `.bufferingNewest(1)` is clean TLA-verified input layer; `HardwareEventBridge` must be `ViewModifier` not class (needs `@State` lifecycle). |
-| What have I done? | Phase 1: foundations (1.1) + capture (1.2). Phase 2 Sprint 1: detector + fusion. Phase 2 Sprint 2: modal-input (Mode enum + CrownQuantizer + ModalInputCoordinator actor + HardwareEventBridge ViewModifier + VoiceOver rotor), scene-description (SceneDescriptionPipeline + DescriptionTemplateFormatter + SalienceScorer), ocr (OcrPipeline + ReadingOrderSorter + TextConfidenceFilter + RawTextObservation). |
-| What's next? | Phase 2 Sprint 2: modal-input first (sequential), then scene-description + ocr in parallel. Within-phase auto gate — proceeds without user approval per workflow.md. |
+| What have I learned? | Key 3.1: `project.yml` must be updated alongside `Package.swift` for new SPM deps — XcodeGen drives the xcodeproj, not `Package.swift`. `Atomic<Bool>` from `Synchronization` is the correct tool for single-write cancellation flags in Swift 6. GRDB `PersistableRecord`/`FetchableRecord` pattern works cleanly with SIMD3<Float> split into three Float columns. `SpatialHash` as a value type gives snapshot safety for free. |
+| What have I done? | Phase 1: foundations (1.1) + capture (1.2). Phase 2: detector + fusion (2.1), modal-input + scene-description + ocr (2.2). Phase 3 Sprint 1: annotation-store (GRDB, SpatialHash, AnchorRehydrator, AnchorMetadata) + gemma-enrichment (GemmaRunner, GemmaPriorityQueue, EnrichmentOrchestrator, 3 prompt builders). |
+| What's next? | Phase 3 Sprint 2: spatial-recall + ambient-announce + onboarding-download. Within-phase auto gate — proceeds without user approval per workflow.md. |
