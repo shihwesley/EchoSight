@@ -1,5 +1,58 @@
 # Progress Log
 
+## Session: 2026-04-22 (Sprint 4.5 execution)
+
+### Sprint 4.5 — photos-library-capture-source — merged 61ea3a9
+
+**Deliverable 1: Latent capture-flow bug fixed.** `PeekABooSource.handleCapture(_:)` had zero callers; the `.onCapture` SwiftUI modifier was never attached. This sprint wires the capture pipeline for the first time via an internal `PHPhotoLibraryChangeObserver` (`ScreenshotObserver`). The flow now runs end-to-end on device: screenshot gesture → PhotoKit callback → `handleCapture` → `frames` stream → downstream detectors.
+
+**Deliverable 2: PeekABoo SPM dependency removed.** Sole call site was `PeekABoo.requestAccess()` in `CapturePrivacyOnboardingView.swift:110`. Replaced with 2 lines of `PHPhotoLibrary.requestAuthorization`. `project.yml` updated, `EchoSight.xcodeproj` regenerated via xcodegen.
+
+**PeekABoo reference count: before=8 in Sources/Tests/Package.swift/project.yml → after=0 (hard gate passed)**
+
+**Build: green. Warnings: 0 (Sprint 4.4 gate preserved).**
+
+**Commits (8 commits + merge):**
+- `affc026` — feat(sprint-4.5): replace PeekABoo.requestAccess with PHPhotoLibrary
+- `a617466` — feat(sprint-4.5): wire internal screenshot observer
+- `e8c4188` — refactor(sprint-4.5): rename PeekABooSource -> PhotosLibraryCaptureSource
+- `2e5aab5` — chore(sprint-4.5): remove PeekABoo dependency + regenerate xcodeproj
+- `7715682` — docs(sprint-4.5): Package.swift comment + README credit + doc refresh
+- `b1d397b` — fix(sprint-4.5): seed observer, fix predicate bitmask, use changeDetails cache pattern
+- `f50f7fd` — test(sprint-4.5): add PhotosLibraryCaptureSource observer wiring tests
+- `a00cd2e` — fix(sprint-4.5): MainActor-isolate ScreenshotObserver, add recency guard for iCloud sync
+- `61ea3a9` — merge(sprint-4.5): PhotosLibraryCaptureSource — latent capture bug fix + PeekABoo removal
+
+**Review findings:**
+- P0: 0
+- P1: 5 found (3 from first pass, 2 from code-review-pro) — all fixed before merge
+  - Stale-screenshot replay: `lastSeenLocalIdentifier` started nil; seeded in `start()` before `register()`
+  - mediaSubtype predicate `==` → bitmask `(& %d) != 0` (catches HDR/depth-flagged screenshots)
+  - Full library re-fetch per change → `changeDetails(for: cachedFetchResult)` cache pattern
+  - `ScreenshotObserver` data race under Swift 6: `@MainActor` annotation + `nonisolated photoLibraryDidChange` hop
+  - iCloud sync spurious replay: recency guard (`creationDate < 30s`) in fast and fallback paths
+- P2/P3 deferred (logged for follow-up):
+  - P2: `handleCapture` still has its own `PHAsset.fetchAssets` with `==` predicate (inconsistency; on visionOS benign since screenshots have no additional subtype bits)
+  - P2: fetch options/predicate/sort-descriptor allocated per fallback call — hoist to shared static when needed
+  - P2: `stop()` has no log entry for "stopped while capture in flight"
+  - P3: `requestImage` ID discarded — no cancel on `stop()`; low priority for this sprint
+  - P3: `requestOptions.isNetworkAccessAllowed = false` not set explicitly (screenshots always local)
+
+**Spec Status table updated below.**
+
+**Manual verification required:** Observer callback path cannot be unit-tested without a real Photos session. To verify on device: grant Photos access, take a screenshot, confirm "capture.delivered" appears in unified log under subsystem `echosight.capture`.
+
+---
+
+## Spec Status
+
+| spec | phase | sprint | status | merge_sha | date |
+|------|-------|--------|--------|-----------|------|
+| photos-library-capture-source | 4 | 5 | completed | 61ea3a9 | 2026-04-22 |
+| backlog-pre-existing-warnings | 4 | 4 | completed | 39c9ddc | 2026-04-22 |
+
+---
+
 ## Session: 2026-04-22 (Sprint 4.5 planning)
 
 ### Sprint 4.5 — photos-library-capture-source

@@ -131,7 +131,7 @@ graph TD
 | backlog-hig-warnings | specs/backlog-hig-warnings-spec.md | 4 | 2 | completed | 110 | HIG P2/P3 deferrals + Sprint 3.2 build-warning cleanup |
 | quality-audits | specs/quality-audits-spec.md | 4 | 3 | completed | 120 | /test-review + /perf-review + P0/P1 audit fixes |
 | backlog-pre-existing-warnings | specs/backlog-pre-existing-warnings-spec.md | 4 | 4 | completed | 110 | Clear 17 pre-existing warnings (Sprint 4.2 surfaced) + silence VisionDetector won't-fix noise |
-| photos-library-capture-source | specs/photos-library-capture-source-spec.md | 4 | 5 | eng-reviewed | 200 | Remove PeekABoo dep + wire internal screenshot observer + rename source class |
+| photos-library-capture-source | specs/photos-library-capture-source-spec.md | 4 | 5 | completed | 200 | Remove PeekABoo dep + wire internal screenshot observer + rename source class |
 
 Total specs: **21** (16 feature specs across Phases 1–3 + 5 housekeeping/cleanup specs in Phase 4). New specs from eng review: speech-out, observability. New specs from Phase 4 planning (2026-04-22): backlog-codereview, backlog-hig-warnings, quality-audits, backlog-pre-existing-warnings, photos-library-capture-source.
 
