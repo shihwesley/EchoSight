@@ -44,7 +44,10 @@ public actor ChimeRenderer {
 
     /// Play the spatial chime at 1 m ahead of the user.
     ///
-    /// Non-blocking: schedules the buffer and returns. Failure is logged, not thrown.
+    /// Suspends briefly while the buffer is scheduled (not until playback completes).
+    /// Re-entrancy during the suspension window is safe: AmbientAnnounceCoordinator's
+    /// 2-second chime gate prevents concurrent calls under normal operation.
+    /// Failure is logged, not thrown.
     public func play() async {
         if !isConfigured {
             configure()
@@ -64,7 +67,8 @@ public actor ChimeRenderer {
             z: -Constants.positionAheadMeters
         )
 
-        playerNode.scheduleBuffer(buffer, completionHandler: nil)
+        // Suspends until buffer is queued (not until playback ends). Returns well before audio plays.
+        await playerNode.scheduleBuffer(buffer)
 
         if !playerNode.isPlaying {
             playerNode.play()

@@ -42,7 +42,7 @@ struct PrivacyDisclosureView: View {
 
                 privacySection(
                     heading: "Storage",
-                    body: "The app downloads approximately 2.6 gigabytes of model files on first launch. These are stored in the app's private storage and can be removed by deleting EchoSight."
+                    body: "The app downloads about 2.6 GB of model files on first launch. These stay on your Vision Pro and are removed when you delete EchoSight."
                 )
 
                 Divider()

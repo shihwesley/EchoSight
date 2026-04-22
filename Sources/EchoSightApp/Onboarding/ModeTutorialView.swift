@@ -99,6 +99,7 @@ struct ModeTutorialView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .accessibilityLabel("Step \(currentStep + 1) of \(steps.count)")
+                        .accessibilityAddTraits(.isStaticText)
 
                     Text(step.modeLabel)
                         .font(.title)

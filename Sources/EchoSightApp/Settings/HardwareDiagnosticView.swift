@@ -85,8 +85,7 @@ public struct HardwareDiagnosticView: View {
                             simulateCrownTick(clockwise: false)
                         }
                         .buttonStyle(.bordered)
-                        // HIG P2-DEFERRED: Add .accessibilityHint to match the clockwise button.
-                        // (HIG-P2-2, sprint-3.2)
+                        .accessibilityHint("Records a counterclockwise Crown tick for testing.")
                     }
 
                     Button("Reset tick count") {
