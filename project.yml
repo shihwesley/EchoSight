@@ -28,6 +28,8 @@ targets:
     resources:
       - path: Sources/EchoSightApp/Info.plist
         optional: true
+      - path: Resources/Models/yolo11n-int8.mlpackage
+        optional: true
     info:
       path: Sources/EchoSightApp/Info.plist
       properties:

@@ -55,8 +55,18 @@ public final class SpatialSession {
     public func start() async throws {
         log.info("spatial.session.started")
 
+        // SceneReconstructionProvider is unsupported on the visionOS Simulator and
+        // crashes the process if registered. Gate on `isSupported` so the rest of
+        // Layer 1 (world tracking + Date-domain pose ring) still runs in CI.
+        var providers: [any DataProvider] = [worldTracking]
+        if SceneReconstructionProvider.isSupported {
+            providers.append(sceneReconstruction)
+        } else {
+            log.warning("spatial.session.sceneReconstruction.unsupported — running without mesh")
+        }
+
         do {
-            try await arkitSession.run([worldTracking, sceneReconstruction])
+            try await arkitSession.run(providers)
         } catch {
             log.error("spatial.session.start.failed", metadata: ["error": .string(error.localizedDescription)])
             throw EchoSightError.meshNotReady
