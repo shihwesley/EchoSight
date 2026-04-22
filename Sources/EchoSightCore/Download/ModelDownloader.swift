@@ -54,6 +54,8 @@ public final class ModelDownloader: NSObject, URLSessionDownloadDelegate, Observ
         case shaVerificationFailed(entryId: String)
         case sessionError(Error)
         case noDownloadURL
+        /// Destination directory could not be created (full disk, permissions).
+        case directoryCreateFailed(path: String, underlying: Error)
     }
 
     // MARK: - Constants
@@ -129,10 +131,13 @@ public final class ModelDownloader: NSObject, URLSessionDownloadDelegate, Observ
     /// Start or resume downloads for all manifest entries.
     ///
     /// Safe to call multiple times — already-completed entries are skipped.
-    public func startDownloads() {
+    /// Throws `DownloadError.directoryCreateFailed` if the destination directory
+    /// cannot be created (full disk, missing permissions) so the caller can fail
+    /// immediately rather than discovering the problem 2 GB later on file move.
+    public func startDownloads() throws {
         // P1-1 FIX: Fail loud if any non-placeholder entry has a placeholder SHA.
         manifest.assertNonPlaceholderSHAs()
-        ensureDirectoryExists()
+        try ensureDirectoryExists()
         let config = makeSessionConfiguration()
         let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         self.session = session
@@ -180,6 +185,13 @@ public final class ModelDownloader: NSObject, URLSessionDownloadDelegate, Observ
             log.info("download.allAlreadyCompleted")
             finalizeIfAllComplete()
         }
+    }
+
+    /// Surfaces a directory-creation error through the standard `.failed` state
+    /// so the UI shows the existing error treatment without additional coupling.
+    public func handleDirectoryError(_ error: Error) {
+        log.error("download.directory.failed", metadata: ["error": .string("\(error)")])
+        state = .failed(error)
     }
 
     /// Pause all active downloads, persisting resume data.
@@ -233,14 +245,18 @@ public final class ModelDownloader: NSObject, URLSessionDownloadDelegate, Observ
         return config
     }
 
-    private func ensureDirectoryExists() {
-        // P2-DEFERRED: Silently swallows directory-creation errors (full disk, permissions).
-        // Should propagate the error so startDownloads() can fail immediately rather than
-        // discovering the problem 2 GB later on file move. (P2-2, sprint-3.2)
-        try? FileManager.default.createDirectory(
-            at: destinationDirectory,
-            withIntermediateDirectories: true
-        )
+    private func ensureDirectoryExists() throws {
+        do {
+            try FileManager.default.createDirectory(
+                at: destinationDirectory,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            throw DownloadError.directoryCreateFailed(
+                path: destinationDirectory.path,
+                underlying: error
+            )
+        }
     }
 
     // MARK: - URLSessionDownloadDelegate

@@ -100,7 +100,9 @@ public actor SpatialRecallOrchestrator {
             try await annotationStore.nearestAnnotations(to: pos, radius: radius)
         }
         self.gemmaSummarize = { annotations in
-            try await gemmaRunner.summarize(annotations: annotations)
+            // headPoseProvider is captured here; head pose is sampled at the
+            // moment summarize is called so the distance is user-relative.
+            try await gemmaRunner.summarize(annotations: annotations, headPose: headPoseProvider())
         }
         self.speakAction = { utterance, priority in
             await speechOut.speak(utterance, priority: priority)

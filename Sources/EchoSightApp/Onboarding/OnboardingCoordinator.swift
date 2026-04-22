@@ -44,6 +44,12 @@ public final class OnboardingCoordinator: ObservableObject {
     private let defaults: UserDefaults
     private let log = Logger(label: "echosight.download")
 
+    // MARK: - Timing
+
+    /// Records when the user entered the onboarding flow (privacy acceptance).
+    /// Used to compute the actual onboarding duration in `markOnboardingComplete`.
+    private var onboardingStartedAt: Date?
+
     // MARK: - Init
 
     public init(downloader: ModelDownloader = ModelDownloader(), defaults: UserDefaults = .standard) {
@@ -66,6 +72,7 @@ public final class OnboardingCoordinator: ObservableObject {
 
     public func acceptPrivacy() {
         defaults.set(true, forKey: Keys.privacyAccepted)
+        onboardingStartedAt = Date()
         log.info("privacy.accepted")
         step = .downloading
     }
@@ -93,7 +100,16 @@ public final class OnboardingCoordinator: ObservableObject {
 
     private func markOnboardingComplete() {
         defaults.set(true, forKey: Keys.onboardingCompleted)
-        log.info("tutorial.completed", metadata: ["durationSec": "0"])
+        let durationSec: Int
+        if let startedAt = onboardingStartedAt {
+            durationSec = Int(Date().timeIntervalSince(startedAt))
+        } else {
+            // startedAt is nil when the coordinator was restored mid-flow
+            // (i.e. app relaunched during onboarding). Log -1 to distinguish
+            // from a genuine zero-second completion.
+            durationSec = -1
+        }
+        log.info("tutorial.completed", metadata: ["durationSec": .string("\(durationSec)")])
         step = .completed
     }
 }

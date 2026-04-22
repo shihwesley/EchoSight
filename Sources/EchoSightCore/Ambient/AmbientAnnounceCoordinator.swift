@@ -90,6 +90,9 @@ public actor AmbientAnnounceCoordinator {
     private var sessionResumeDampener = SessionResumeDampener()
     private var currentSpeechToken: SpeechToken?
     private var listenTask: Task<Void, Never>?
+    /// Tracked fire-and-forget cancel Tasks. Stored so stop() can cancel any
+    /// in-flight cancellations that outlive the event loop on rapid mode changes.
+    private var pendingCancelTasks: Set<Task<Void, Never>> = []
 
     // MARK: - Init (production)
 
@@ -170,6 +173,8 @@ public actor AmbientAnnounceCoordinator {
     public func stop() {
         listenTask?.cancel()
         listenTask = nil
+        for task in pendingCancelTasks { task.cancel() }
+        pendingCancelTasks.removeAll()
         log.info("ambient.stopped")
     }
 
@@ -214,54 +219,78 @@ public actor AmbientAnnounceCoordinator {
         let now = Date()
         let anchorId = event.anchorId
         let hashedId = String(anchorId.uuidString.prefix(8))
-        log.info("ambient.anchor.received", metadata: ["hashedId": .string(hashedId), "kind": .string("\(event.kind)")])
+        log.info("ambient.anchor.received", metadata: [
+            "hashedId": .string(hashedId),
+            "kind": .string("\(event.kind)"),
+        ])
 
-        // Gate 1: Session-resume dampening — suppresses all chimes during 3-s window.
+        guard await shouldChime(for: event, now: now) else { return }
+
+        guard let lastSeenDate = await resolveNovelty(anchorId: anchorId, now: now) else { return }
+
+        guard passesSpeechGates(now: now) else { return }
+
+        await performSpeech(
+            anchorId: anchorId,
+            lastSeenDate: lastSeenDate,
+            now: now
+        )
+    }
+
+    /// Gates 1–3: Session-resume dampening + chime rate limit + chime fire.
+    /// Returns `true` if the chime fired (caller may proceed to speech gates).
+    private func shouldChime(for event: AnchorChangeEvent, now: Date) async -> Bool {
         if event.kind == .sessionResumeRerecognized {
             sessionResumeDampener.trigger(now: now)
         }
 
-        if sessionResumeDampener.isSuppressing(now: now) {
+        guard !sessionResumeDampener.isSuppressing(now: now) else {
             log.debug("ambient.chime.suppressed", metadata: ["reason": "sessionResumeDampen"])
-            return
+            return false
         }
 
-        // Gate 2: Chime rate limit.
-        guard rateLimiter.canChime(now: now) else { return }
+        guard rateLimiter.canChime(now: now) else { return false }
 
-        // Gate 3: Fire chime (always, for non-suppressed events).
         rateLimiter.recordChime(now: now)
         await chimeRenderer.play()
         log.info("ambient.chime.fired")
+        return true
+    }
 
-        // Gate 4: Novelty check.
+    /// Gate 4: Novelty check.
+    /// Returns `lastSeenDate` (nil = first visit) if the anchor is cold; nil = gated.
+    private func resolveNovelty(anchorId: UUID, now: Date) async -> Date?? {
         let lastSeenDate: Date?
         do {
             lastSeenDate = try await lastSeen(anchorId)
         } catch {
-            log.error("ambient.novelty.lastSeen.failed", metadata: ["error": .string(error.localizedDescription)])
-            return
+            log.error("ambient.novelty.lastSeen.failed", metadata: [
+                "error": .string(error.localizedDescription),
+            ])
+            return nil
         }
 
         guard noveltyDetector.isCold(anchorId: anchorId, lastSeenAt: lastSeenDate, now: now) else {
             log.debug("ambient.speech.gated", metadata: ["passed": "false", "failedGate": "novelty(hot)"])
-            return
+            return nil
         }
 
-        // Gate 5: Silent mode. (Must be checked by this coordinator — .high bypasses SpeechOut's gate.)
+        return .some(lastSeenDate)
+    }
+
+    /// Gates 5–8: Silent mode, gesture idle, head-motion, speech rate limit.
+    private func passesSpeechGates(now: Date) -> Bool {
         guard !silentMode() else {
             log.info("ambient.silent.suppressed")
             log.debug("ambient.speech.gated", metadata: ["passed": "false", "failedGate": "silentMode"])
-            return
+            return false
         }
 
-        // Gate 6: Gesture idle.
         guard idleTracker.isIdle(now: now) else {
             log.debug("ambient.speech.gated", metadata: ["passed": "false", "failedGate": "gestureActive"])
-            return
+            return false
         }
 
-        // Gate 7: Head-motion (device-put-down suppression).
         let varianceRad = headVariance(Constants.headMotionWindow)
         let varianceDeg = varianceRad * (180.0 / .pi)
         guard varianceDeg >= Constants.headMotionThresholdDeg else {
@@ -271,7 +300,7 @@ public actor AmbientAnnounceCoordinator {
                 "variance": .string("\(String(format: "%.1f", varianceDeg))deg"),
             ])
             log.debug("ambient.speech.gated", metadata: ["passed": "false", "failedGate": "headMotionBelow"])
-            return
+            return false
         }
 
         log.info("ambient.idle.evaluated", metadata: [
@@ -280,15 +309,17 @@ public actor AmbientAnnounceCoordinator {
             "variance": .string("\(String(format: "%.1f", varianceDeg))deg"),
         ])
 
-        // Gate 8: Speech rate limit.
         guard rateLimiter.canSpeak(now: now) else {
             log.debug("ambient.speech.gated", metadata: ["passed": "false", "failedGate": "speechRateLimit"])
-            return
+            return false
         }
 
         log.debug("ambient.speech.gated", metadata: ["passed": "true", "failedGate": "none"])
+        return true
+    }
 
-        // Gate 9: Gemma inferRoomLabel (with mesh fallback).
+    /// Gates 9–10: Gemma room-label inference + SpeechOut.speak + encounter record.
+    private func performSpeech(anchorId: UUID, lastSeenDate: Date?, now: Date) async {
         let isFirstVisit = (lastSeenDate == nil)
         let count: Int
         do {
@@ -305,7 +336,6 @@ public actor AmbientAnnounceCoordinator {
             isFirstVisit: isFirstVisit
         )
 
-        // Gate 10: Speak.
         let announceText = buildAnnounceText(
             label: label,
             lastSeen: lastSeenDate,
@@ -315,7 +345,6 @@ public actor AmbientAnnounceCoordinator {
         )
 
         rateLimiter.recordSpeech(now: now)
-
         let token = await speakAction(SpeechUtterance(text: announceText), .high)
         currentSpeechToken = token
 
@@ -324,11 +353,12 @@ public actor AmbientAnnounceCoordinator {
             "wasPreempting": .string("false"),
         ])
 
-        // Record encounter so this anchor is no longer cold for the next 30 min.
         do {
             try await recordEncounter(anchorId)
         } catch {
-            log.error("ambient.encounter.recordFailed", metadata: ["error": .string(error.localizedDescription)])
+            log.error("ambient.encounter.recordFailed", metadata: [
+                "error": .string(error.localizedDescription),
+            ])
         }
     }
 
@@ -341,13 +371,18 @@ public actor AmbientAnnounceCoordinator {
         // If a .silent mode change arrives while ambient has an in-flight .high utterance,
         // cancel our own token immediately. Ambient speech is app-initiated (push).
         // A silent toggle is an explicit "stop pushing things at me" signal.
-        // P2-DEFERRED: This cancel Task is fire-and-forget. Track it in a Set<Task<Void,Never>>
-        // and cancel on stop() to avoid stray executions after teardown. (P2-1, sprint-3.2)
         if event.to == .silent, let token = currentSpeechToken {
             let tokenRef = token
             let cancelAction = cancelToken
-            Task {
+            let cancelTask = Task {
                 await cancelAction(tokenRef)
+            }
+            pendingCancelTasks.insert(cancelTask)
+            // Remove from the tracking set once the task completes so the set
+            // doesn't grow unboundedly under rapid silent-toggle sequences.
+            Task {
+                _ = await cancelTask.value
+                pendingCancelTasks.remove(cancelTask)
             }
             currentSpeechToken = nil
             log.info("ambient.speech.cancelledBysilentToggle")

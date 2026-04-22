@@ -29,7 +29,6 @@ public final class ObstacleRaycaster {
     // MARK: - State
 
     private var task: Task<Void, Never>?
-    private var lastFireTime: Date = .distantPast
 
     // MARK: - Init
 

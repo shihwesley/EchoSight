@@ -115,7 +115,13 @@ struct DownloadProgressView: View {
                 onComplete()
             }
 
-            downloader.startDownloads()
+            do {
+                try downloader.startDownloads()
+            } catch {
+                // Directory creation failed — surface via the downloader's own error state
+                // so the UI can show the existing failed-state treatment.
+                downloader.handleDirectoryError(error)
+            }
         }
     }
 

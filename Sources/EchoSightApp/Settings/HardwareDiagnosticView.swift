@@ -1,5 +1,6 @@
 import SwiftUI
 import Accessibility
+import Logging
 
 // MARK: - HardwareDiagnosticView
 
@@ -196,14 +197,15 @@ public struct HardwareDiagnosticView: View {
 
 // MARK: - HardwareDiagnosticLog
 
-/// Minimal structured logger for diagnostic events. Wraps print for now —
-/// real observability goes through OSLog/swift-log when wired in production.
+/// Structured logger for diagnostic events, routed through swift-log.
 private final class HardwareDiagnosticLog {
+    private let log = Logger(label: "echosight.diagnostic")
+
     func record(_ event: String, count: Int? = nil) {
         if let count {
-            print("[echosight.diagnostic] \(event)(count=\(count))")
+            log.info("\(event)", metadata: ["count": .string("\(count)")])
         } else {
-            print("[echosight.diagnostic] \(event)")
+            log.info("\(event)")
         }
     }
 }

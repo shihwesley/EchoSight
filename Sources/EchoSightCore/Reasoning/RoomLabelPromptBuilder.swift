@@ -41,20 +41,6 @@ public enum RoomLabelPromptBuilder {
     }
 }
 
-// MARK: - MeshClassificationSummary Extension
-
-// P3-DEFERRED: this extension on a Spatial-module type lives in the Reasoning module.
-// Move topClasses(limit:) adjacent to MeshClassificationSummary in Spatial/ when convenient.
-extension MeshClassificationSummary {
-    /// Returns the top N mesh classes sorted by proportion descending.
-    func topClasses(limit: Int) -> [(key: MeshClass, value: Float)] {
-        distribution
-            .sorted { $0.value > $1.value }
-            .prefix(limit)
-            .map { (key: $0.key, value: $0.value) }
-    }
-}
-
 // MARK: - String Helper
 
 private extension String {

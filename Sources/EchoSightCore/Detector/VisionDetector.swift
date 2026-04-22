@@ -98,8 +98,6 @@ public actor VisionDetector: Detector {
 
     /// Run object detection on the given frame.
     ///
-    /// Run object detection on the given frame.
-    ///
     /// Applies a 2-second timeout. Returns `[]` on timeout rather than throwing,
     /// to keep the scene-mode pipeline running even if a frame takes too long.
     ///

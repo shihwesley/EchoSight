@@ -89,16 +89,17 @@ public actor OcrPipeline {
         changeEvents: AsyncStream<ModeChangeEvent>
     ) {
         // Fire subscription — react to .read events.
-        Task { [weak self] in
-            guard let self else { return }
+        // Actors are reference types — [weak self] is an anti-pattern in actor-owned
+        // Tasks. It can cause the loop to silently not start if the actor deallocates
+        // before the Task's first suspension. Capture self directly; stop() cancels.
+        Task {
             for await event in firedEvents where event.mode == .read {
                 await self.handleFire(event: event)
             }
         }
 
         // Cancel subscription — abort on any mode change.
-        Task { [weak self] in
-            guard let self else { return }
+        Task {
             for await _ in changeEvents {
                 await self.cancelCurrentPipeline(reason: "mode-change")
             }
@@ -112,8 +113,7 @@ public actor OcrPipeline {
         currentTask?.cancel()
         log.info("read.fire.received")
 
-        currentTask = Task { [weak self] in
-            guard let self else { return }
+        currentTask = Task {
             await self.runPipeline()
         }
     }

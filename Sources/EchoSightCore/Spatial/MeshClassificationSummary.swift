@@ -66,3 +66,15 @@ public struct MeshClassificationSummary: Sendable {
         confidence >= 0.6 && triangleCount >= 500
     }
 }
+
+// MARK: - RoomLabelPromptBuilder Support
+
+extension MeshClassificationSummary {
+    /// Returns the top N mesh classes sorted by proportion descending.
+    func topClasses(limit: Int) -> [(key: MeshClass, value: Float)] {
+        distribution
+            .sorted { $0.value > $1.value }
+            .prefix(limit)
+            .map { (key: $0.key, value: $0.value) }
+    }
+}
