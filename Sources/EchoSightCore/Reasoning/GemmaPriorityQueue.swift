@@ -87,7 +87,7 @@ public actor GemmaPriorityQueue {
     /// - Parameter generate: Closure that performs actual mlx inference.
     ///   Signature: `(prompt, maxTokens, timeoutSeconds) async throws -> String`
     ///   Injected by `GemmaRunner` at init time via a closure over its `generateRaw` method.
-    public init(generate: @escaping GenerateFn) {
+    init(generate: @escaping GenerateFn) {
         self.generate = generate
     }
 

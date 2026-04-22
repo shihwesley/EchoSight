@@ -47,16 +47,19 @@ public actor GemmaRunner {
         // reference back to GemmaRunner, breaking the potential retain cycle.
         let manager = modelManager
         self.queue = GemmaPriorityQueue { prompt, maxTokens, timeout in
-            var cancelled = false
+            // CancelFlag is a class so the onCancel handler and the closure read the
+            // same heap object. nonisolated(unsafe) is appropriate here: the flag is
+            // set exactly once (onCancel) and read cooperatively inside the model loop.
+            let flag = CancelFlag()
             return try await withTaskCancellationHandler {
                 try await manager.generate(
                     prompt: prompt,
                     maxTokens: maxTokens,
                     timeoutSeconds: timeout,
-                    cancelled: { Task.isCancelled || cancelled }
+                    cancelled: { Task.isCancelled || flag.isCancelled }
                 )
             } onCancel: {
-                cancelled = true
+                flag.cancel()
             }
         }
     }
@@ -136,6 +139,22 @@ public actor GemmaRunner {
         )
     }
 
+}
+
+// MARK: - CancelFlag
+
+/// Thread-safe single-write boolean for cooperative cancellation.
+///
+/// Used by `GemmaRunner`'s generate closure to communicate task cancellation
+/// to `GemmaModelManager.generate`'s cooperative polling loop.
+/// Class reference shared between the `onCancel` handler and the closure body.
+private final class CancelFlag: @unchecked Sendable {
+    // nonisolated(unsafe): written once from onCancel, read-only inside the model loop.
+    // The write happens-before any read because onCancel fires before the closure resumes.
+    nonisolated(unsafe) private var _cancelled = false
+
+    func cancel() { _cancelled = true }
+    var isCancelled: Bool { _cancelled }
 }
 
 // MARK: - EnrichmentContext
