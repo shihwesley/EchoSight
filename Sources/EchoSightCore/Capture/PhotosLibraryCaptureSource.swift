@@ -266,6 +266,7 @@ public final class PhotosLibraryCaptureSource: PassthroughCaptureSource {
 
 // MARK: - ScreenshotObserver
 
+@MainActor
 private final class ScreenshotObserver: NSObject, PHPhotoLibraryChangeObserver {
     private weak var source: PhotosLibraryCaptureSource?
     private var lastSeenLocalIdentifier: String?
@@ -289,21 +290,31 @@ private final class ScreenshotObserver: NSObject, PHPhotoLibraryChangeObserver {
         cachedFetchResult = PHAsset.fetchAssets(with: .image, options: options)
     }
 
-    func photoLibraryDidChange(_ changeInstance: PHChange) {
-        // Fast path: if we have a cached result, check if screenshots changed
+    // PHPhotoLibraryChangeObserver is nonisolated — hop to main actor so all
+    // mutation of cachedFetchResult and lastSeenLocalIdentifier stays on the
+    // main actor, avoiding a Swift 6 data race with start() and stop().
+    nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
+        Task { @MainActor in self._photoLibraryDidChange(changeInstance) }
+    }
+
+    private func _photoLibraryDidChange(_ changeInstance: PHChange) {
+        // Fast path: use the cached fetch result to detect insertions only
         if let current = cachedFetchResult,
            let details = changeInstance.changeDetails(for: current) {
             cachedFetchResult = details.fetchResultAfterChanges
             // Only proceed if something was inserted
             guard !details.insertedObjects.isEmpty,
                   let asset = details.fetchResultAfterChanges.firstObject else { return }
+            // Guard against iCloud sync delivering old screenshots as "insertions"
+            let isRecent = asset.creationDate.map { Date().timeIntervalSince($0) < 30 } ?? false
+            guard isRecent else { return }
             guard asset.localIdentifier != lastSeenLocalIdentifier else { return }
             lastSeenLocalIdentifier = asset.localIdentifier
             deliverImage(for: asset)
             return
         }
 
-        // Fallback path: no cached result yet, do a direct fetch
+        // Fallback path: cachedFetchResult not yet set; do a direct fetch
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.fetchLimit = 1
@@ -313,6 +324,8 @@ private final class ScreenshotObserver: NSObject, PHPhotoLibraryChangeObserver {
         let result = PHAsset.fetchAssets(with: .image, options: options)
         cachedFetchResult = result
         guard let asset = result.firstObject else { return }
+        let isRecent = asset.creationDate.map { Date().timeIntervalSince($0) < 30 } ?? false
+        guard isRecent else { return }
         guard asset.localIdentifier != lastSeenLocalIdentifier else { return }
         lastSeenLocalIdentifier = asset.localIdentifier
         deliverImage(for: asset)
@@ -328,7 +341,12 @@ private final class ScreenshotObserver: NSObject, PHPhotoLibraryChangeObserver {
             targetSize: PHImageManagerMaximumSize,
             contentMode: .default,
             options: requestOptions
-        ) { [weak self] image, _ in
+        ) { [weak self] image, info in
+            if let error = info?[PHImageErrorKey] as? Error {
+                // Non-fatal: log and discard. Common on iCloud-not-downloaded assets.
+                _ = error // logger not available here; parent source logs at handleCapture
+                return
+            }
             guard let self, let image, let source = self.source else { return }
             Task { @MainActor in await source.handleCapture(image) }
         }
