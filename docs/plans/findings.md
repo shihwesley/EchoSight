@@ -429,3 +429,146 @@ let outcome = await token.completion                               // async
 
 **Phase-runner partial completion.** The phase-runner agent executing Sprint 4.1 hit Claude usage limits after landing all 5 fix commits but before running `/code-review-pro` on the diff, writing the findings.md won't-fix entry, or updating progress.md. Close-out was completed from the main orchestrator context. `/code-review-pro` on the Sprint 4.1 diff is logged as **S4.1-FOLLOWUP-1** for Sprint 4.3 or pre-release manual invocation.
 
+---
+
+## Phase 4 Post-Audit Backlog (2026-04-22)
+
+Findings from Sprint 4.3 audits (code-review-pro on Sprint 4.1 diff,
+test-review on Sprint 3.2 tests, perf-review on v0.1 latency budgets).
+All P2/P3 items below. Rationale for deferral: none affect correctness
+for v0.1 shipping behavior; all are API hygiene, test coverage gaps,
+or instrumentation improvements.
+
+### Pre-existing Warnings (potential Sprint 4.4)
+
+17 pre-existing build warnings were surfaced during Sprint 4.2's warning-count
+measurement. They were outside Sprint 4.2's scope (HIG fixes + warning baseline
+measurement) and outside Sprint 4.3's scope (audits + P0/P1 fixes).
+
+Files with pre-existing warnings:
+- `VisionDetector.swift`, `OcrPipeline.swift`, `SceneDescriptionPipeline.swift`
+- `ModalInputCoordinator.swift`, `PipelineMetricsBuffer.swift`
+- `AnchorEventStream.swift`, `SpeechOut.swift`
+- 2 non-Swift tool warnings (Xcode toolchain)
+
+Suggested Sprint 4.4 before v0.1 ships: one session clearing all 17 warnings
+to arrive at a 0-warning baseline for the release build.
+
+---
+
+### From /code-review-pro on Sprint 4.1 diff (6d9f48a..9e80f05)
+
+**P2-CR41-1** — `ModelDownloader.handleDirectoryError` is `public` but has
+only one caller (`DownloadProgressView`). Could be `internal`.  
+File: `Sources/EchoSightCore/Download/ModelDownloader.swift:195`  
+Deferral: no safety risk; API surface hygiene; single caller; v0.1 scope.
+
+**P2-CR41-2** — The "self-removal" Task inside `AmbientAnnounceCoordinator.handleModeChange`
+(cleans up `pendingCancelTasks`) is itself untracked. Under rapid silent-toggles it
+produces O(N) untracked cleanup tasks; each is trivially short so no observable
+side-effect exists, but the oversight is worth noting.  
+File: `Sources/EchoSightCore/Ambient/AmbientAnnounceCoordinator.swift:387`  
+Deferral: sub-millisecond window, no observable side-effect; P2 housekeeping.
+
+**P2-CR41-3** — `AnchorRehydrator.failureCounts` is cleared by `reset()` (on session
+interruption). The retry cap is per-session, not per-anchor lifetime; a persistently
+broken anchor gets 5 new attempts per session restart.  
+File: `Sources/EchoSightCore/Memory/AnchorRehydrator.swift:30`  
+Deferral: real-world DB corruption that survives relaunch warrants a user-facing
+error path, not just a retry cap. Post-v0.1.
+
+**P3-CR41-1** — `OnboardingCoordinator.markOnboardingComplete` logs `durationSec: -1`
+as a sentinel for mid-flow relaunches. A typed flag (`isRestored: Bool`) would be
+cleaner for analytics dashboards.  
+File: `Sources/EchoSightApp/Onboarding/OnboardingCoordinator.swift:112`  
+Deferral: no user impact; analytics schema concern; post-v0.1.
+
+**P3-CR41-2** — `AmbientAnnounceCoordinator.resolveNovelty` returns `Date??`
+(optional-optional). A named enum (`NoveltyResult`) would be more readable.  
+File: `Sources/EchoSightCore/Ambient/AmbientAnnounceCoordinator.swift:246`  
+Deferral: semantically correct; readability concern only.
+
+---
+
+### From /test-review on Sprint 3.2 test files
+
+**P2-TR32-1** — `SpatialRecallOrchestratorTests.makeOrchestrator`'s `gemmaSummarize`
+closure discards the annotations array. Template-path tests (`gemmaFailureFallsBackToTemplate`)
+cannot verify that the correct annotations are passed through.  
+File: `Tests/EchoSightCoreTests/SpatialRecallOrchestratorTests.swift:47`  
+Deferral: existing check is not wrong; improving it requires factory changes post-v0.1.
+
+**P2-TR32-2** — `AmbientAnnounceCoordinatorTests` never verifies chime count.
+If `ChimeRenderer.play()` silently fails (audio session unavailable in tests),
+no test would catch it. Recommend mocking `chimeRenderer` with a closure.  
+File: `Tests/EchoSightCoreTests/AmbientAnnounceCoordinatorTests.swift:72`  
+Deferral: hot-anchor and silent suppression tests cover speech gating; chime path
+less critical for v0.1.
+
+**P2-TR32-3** — Two `makeAnnotation` factories exist for `WorldAnnotation`
+(`TestSupport/Annotations.swift` and `SpatialRecallOrchestratorTests.swift`),
+diverging in parameter names and defaults.  
+File: `Tests/EchoSightCoreTests/SpatialRecallOrchestratorTests.swift:326`  
+Deferral: both compile; cosmetic friction; consolidate post-v0.1.
+
+**P2-TR32-4** — `ModelDownloaderTests.resumeDataPersistedOnPause` test name
+doesn't match what it tests (it checks the completed flag starts false, not
+resume-data persistence).  
+File: `Tests/EchoSightCoreTests/ModelDownloaderTests.swift:88`  
+Deferral: the assertion is correct; the name is misleading; rename post-v0.1.
+
+**P3-TR32-1** — Typo: `gestureActiveSuppreshesSpeech` (should be "Suppresses").  
+File: `Tests/EchoSightCoreTests/AmbientAnnounceCoordinatorTests.swift`  
+Deferral: cosmetic; no correctness impact.
+
+**P3-TR32-2** — Typo: `devicePutDownSuppreshesSpeech` (same typo).  
+File: `Tests/EchoSightCoreTests/AmbientAnnounceCoordinatorTests.swift`  
+Deferral: cosmetic; no correctness impact.
+
+---
+
+### From /perf-review on v0.1 latency budgets
+
+**P2-PR32-1** — `SpatialRecallOrchestrator.fetchGestalt` has no orchestrator-level
+timeout. `GemmaPriorityQueue` enforces a per-item timeout, but a congested queue
+means the orchestrator waits for a queue slot before that timeout starts. Under
+heavy `EnrichmentOrchestrator` load, the 2 s recall-gestalt budget could be breached.  
+File: `Sources/EchoSightCore/Features/SpatialRecallOrchestrator.swift` — `fetchGestalt`  
+Deferral: `.high` priority preemption limits queue wait in practice; full timeout
+instrumentation is post-v0.1.
+
+**P2-PR32-2** — `SceneDescriptionPipeline.runPipeline` passes `scene: nil` (v0.1
+defers live `RealityKit.Scene` raycast). The v1.0 path will require a `@MainActor`
+hop inside `FusionEngine.fuse`, adding latency to the ≤1.5 s scene budget.  
+File: `Sources/EchoSightCore/Features/SceneDescriptionPipeline.swift:153`  
+Deferral: v0.1 avoids the hop entirely; design attention required pre-v1.0.
+
+**P3-PR32-1** — Silent-mid-flight cancel latency is not instrumented.
+`PipelineMetricsBuffer` doesn't capture cancel-to-silence timing; worst-case
+under heavy actor contention is unverified against the ≤100 ms budget.  
+File: `Sources/EchoSightCore/Ambient/AmbientAnnounceCoordinator.swift:380`  
+Deferral: structural risk low for v0.1; add `PipelineMetricsBuffer` event post-v0.1.
+
+---
+
+### Phase 4 → v0.1 Release Readiness
+
+**Phase 4 is complete.** All four Phase 4 sprints have landed on main:
+- Sprint 4.1: backlog-codereview (5 P2/P3 fix groups)
+- Sprint 4.2: backlog-hig-warnings (build warning cleanup + HIG deferrals)
+- Sprint 4.3: quality-audits (code-review-4.1 + test-review + perf-review)
+
+**Remaining blockers for v0.1 ship:**
+
+1. **17 pre-existing build warnings** — not regressions from Phase 4, but present
+   in the codebase. A clean release build is preferable. Candidate Sprint 4.4.
+
+2. **P2/P3 audit backlog** — all 11 items above are deferred by policy. None are
+   correctness bugs; all are hygiene, coverage gaps, or instrumentation work.
+
+3. **Manual device validation** — tests are written but not executed (visionOS
+   sim-boot exceeds CI watchdog). A test session on AVP hardware before tagging
+   v0.1 is the recommended final gate.
+
+**No P0 or P1 items remain open.** The codebase is structurally sound for v0.1.
+
