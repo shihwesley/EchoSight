@@ -126,14 +126,14 @@ public actor VisionDetector: Detector {
 
         do {
             results = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[DetectionResult], Error>) in
-                var didResume = false
+                let flag = _ResumeFlag()
                 let lock = NSLock()
 
                 let work = DispatchWorkItem {
                     guard let cgImage = frame.image.cgImage else {
                         lock.lock()
-                        guard !didResume else { lock.unlock(); return }
-                        didResume = true
+                        guard !flag.value else { lock.unlock(); return }
+                        flag.value = true
                         lock.unlock()
                         continuation.resume(returning: [])
                         return
@@ -162,14 +162,14 @@ public actor VisionDetector: Detector {
                         }.sorted { $0.confidence > $1.confidence }
 
                         lock.lock()
-                        guard !didResume else { lock.unlock(); return }
-                        didResume = true
+                        guard !flag.value else { lock.unlock(); return }
+                        flag.value = true
                         lock.unlock()
                         continuation.resume(returning: detections)
                     } catch {
                         lock.lock()
-                        guard !didResume else { lock.unlock(); return }
-                        didResume = true
+                        guard !flag.value else { lock.unlock(); return }
+                        flag.value = true
                         lock.unlock()
                         continuation.resume(throwing: error)
                     }
@@ -178,8 +178,8 @@ public actor VisionDetector: Detector {
                 // 2-second timeout
                 inferenceQueue.asyncAfter(deadline: .now() + 2.0) {
                     lock.lock()
-                    guard !didResume else { lock.unlock(); return }
-                    didResume = true
+                    guard !flag.value else { lock.unlock(); return }
+                    flag.value = true
                     lock.unlock()
                     work.cancel()
                     continuation.resume(returning: [])
@@ -249,4 +249,14 @@ public actor VisionDetector: Detector {
             ctx.fill(CGRect(origin: .zero, size: size))
         }
     }
+}
+
+// MARK: - _ResumeFlag
+
+/// Reference-type boolean flag used in the VisionDetector timeout pattern.
+/// Wrapping the flag in a class satisfies Swift 6 Sendable checking for captured
+/// variables in concurrent Dispatch closures — the NSLock in detect(in:) still
+/// serializes all reads and writes; this is a cosmetic change only.
+private final class _ResumeFlag: @unchecked Sendable {
+    var value = false
 }
