@@ -1,5 +1,35 @@
 # Progress Log
 
+## Session: 2026-04-22 (Sprint 4.4 execution)
+
+### Sprint 4.4 — backlog-pre-existing-warnings — merged 39c9ddc
+
+**Warning count: 17 before → 0 after (hard gate passed)**
+
+**Commits (4 fixes + merge):**
+- `114fc37` — fix(sprint-4.4): drop redundant await on sync continuation registrations
+- `6e71838` — fix(sprint-4.4): drop try/catch on non-throwing calls
+- `1ee0284` — fix(sprint-4.4): silence Dispatch Sendable warnings in VisionDetector timeout path
+- `382d080` — fix(sprint-4.4): silence remaining Dispatch Sendable warnings in VisionDetector
+- `39c9ddc` — merge(sprint-4.4): backlog-pre-existing-warnings — 17 compiler warnings → 0
+
+**Pattern 1 — 7 redundant await drops (OcrPipeline x2, SceneDescriptionPipeline x2, PipelineMetricsBuffer x1, AnchorEventStream x1, SpeechOut x1):**
+Inside `Task { await self.X }` bodies where `X` is a non-async actor-isolated method, the `await` is redundant (the Task inherits the actor context). Dropped at all 7 registration sites. `onTermination` Task bodies retain their `await` — those closures run from a non-isolated context and need the hop to reach the actor.
+
+**Pattern 2 — 5 try/catch drops (OcrPipeline x2 call-sites, ModalInputCoordinator x1 call-site):**
+`speechOut.speak()` is non-throwing (returns `SpeechToken` directly). The `do/catch` wrappers were vestigial from a prior signature. Removed `try`, flattened `do` block, dropped unreachable `catch`. Same pattern as Sprint 2.2 SpeechOut call-site fix.
+
+**Pattern 3 — VisionDetector Dispatch/Sendable warnings (4 warnings → 0):**
+`@preconcurrency import Dispatch` silenced 2 of 4 warnings (DispatchWorkItem non-Sendable capture + the compiler's own line-1 suggestion). The remaining 2 — "reference to captured var 'didResume'" and "mutation of captured var 'didResume'" in the asyncAfter timeout closure — are Swift 6 strict-concurrency violations not covered by `@preconcurrency import`. Fix: replaced `var didResume = false` with `_ResumeFlag`, a private `final class` marked `@unchecked Sendable`. NSLock still serializes all reads/writes; the Sprint 2.1 P2#2 won't-fix timeout pattern is unchanged. Zero behavior change.
+
+**Build gate:** `xcodebuild -scheme EchoSight -destination 'generic/platform=visionOS' clean build 2>&1 | grep "warning:" | grep -v appintentsmetadataprocessor | wc -l` = **0** ✓
+
+**Review:** `/code-review-pro` on full diff — clean, 0 P0/P1. All changes verified cosmetic-only.
+
+**Edge case noted (scope containment):** `@preconcurrency import Dispatch` alone was insufficient to silence the `didResume` captured-var warnings — those are Swift 6 concurrency violations independent of the Dispatch module. Required the `_ResumeFlag` class. Pattern is documented above for future reference.
+
+---
+
 ## Session: 2026-04-22 (Sprint 4.4 planning)
 
 ### Sprint 4.4 — backlog-pre-existing-warnings
@@ -624,7 +654,7 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 | backlog-codereview | 4 | 1 | completed | 144d15b | 2026-04-22 |
 | backlog-hig-warnings | 4 | 2 | completed | 1b15225 | 2026-04-22 |
 | quality-audits | 4 | 3 | completed | 36ee359 | 2026-04-22 |
-| backlog-pre-existing-warnings | 4 | 4 | eng-reviewed | — | 2026-04-22 |
+| backlog-pre-existing-warnings | 4 | 4 | completed | 39c9ddc | 2026-04-22 |
 
 <!-- Status values: draft → ceo-reviewed → eng-reviewed → in_progress → completed | blocked | skipped -->
 

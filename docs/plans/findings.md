@@ -557,11 +557,16 @@ Deferral: structural risk low for v0.1; add `PipelineMetricsBuffer` event post-v
 - Sprint 4.1: backlog-codereview (5 P2/P3 fix groups)
 - Sprint 4.2: backlog-hig-warnings (build warning cleanup + HIG deferrals)
 - Sprint 4.3: quality-audits (code-review-4.1 + test-review + perf-review)
+- Sprint 4.4: backlog-pre-existing-warnings (17 warnings → 0, merge `39c9ddc`)
 
 **Remaining blockers for v0.1 ship:**
 
-1. **17 pre-existing build warnings** — not regressions from Phase 4, but present
-   in the codebase. A clean release build is preferable. Candidate Sprint 4.4.
+1. ~~**17 pre-existing build warnings**~~ — **RESOLVED** by Sprint 4.4 merge `39c9ddc`.
+   Clean build now produces 0 Swift compiler warnings (excluding 2 `appintentsmetadataprocessor`
+   tool-chain warnings which are outside Swift-compiler scope). Three fix patterns applied:
+   7 redundant `await` drops, 5 `try/catch` unwraps on non-throwing calls, and
+   `@preconcurrency import Dispatch` + `_ResumeFlag` class for VisionDetector Dispatch/Sendable
+   warnings (preserves Sprint 2.1 P2#2 won't-fix timeout pattern decision).
 
 2. **P2/P3 audit backlog** — all 11 items above are deferred by policy. None are
    correctness bugs; all are hygiene, coverage gaps, or instrumentation work.
