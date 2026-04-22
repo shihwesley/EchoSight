@@ -154,14 +154,7 @@ public actor ModalInputCoordinator {
         // All other confirmations use .normal at a slightly elevated rate.
         let priority: SpeechPriority = (mode == .silent) ? .high : .normal
         let utterance = SpeechUtterance(text: mode.userLabel, rate: 0.55)
-        do {
-            _ = try await speechOut.speak(utterance, priority: priority)
-            log.info("modal.confirmation.spoken", metadata: ["mode": "\(mode.rawValue)"])
-        } catch {
-            log.warning("modal.confirmation.failed", metadata: [
-                "mode": "\(mode.rawValue)",
-                "error": "\(error)"
-            ])
-        }
+        _ = await speechOut.speak(utterance, priority: priority)
+        log.info("modal.confirmation.spoken", metadata: ["mode": "\(mode.rawValue)"])
     }
 }
