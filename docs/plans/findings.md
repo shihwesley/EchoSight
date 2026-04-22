@@ -16,7 +16,7 @@ Greenfield (visionOS SwiftUI app, fresh codebase; 2024 Flutter EchoSight is sepa
 
 Composition of six engine primitives assembled by thin feature pipelines:
 
-1. **PassthroughCaptureSource** (protocol) — PeekABoo today, `CameraFrameProvider` tomorrow.
+1. **PassthroughCaptureSource** (protocol) — PhotosLibraryCaptureSource (PeekABoo removed in Sprint 4.5) today, `CameraFrameProvider` tomorrow.
 2. **Detector** (protocol) — Vision/YOLO v0.1; Falcon-Perception mlx-swift drop-in later.
 3. **Geometric fusion** — pixelToRay + PHAsset time-sync + `Scene.raycast` + mesh classification reconciliation.
 4. **Annotation store** — `WorldAnnotation` + spatial hash + SQLite keyed by persistent world anchor.
@@ -28,7 +28,7 @@ v0.1 delivers Feature 1 (scene description) + Layer 1 ambient awareness. Voice r
 ## Requirements (Validated)
 
 - Layer 1 always-on spatial awareness (mesh + head pose + spatial audio cues)
-- PeekABoo capture + EchoSight dedicated album + clear-captures UX
+- PhotosLibraryCaptureSource (PeekABoo removed in Sprint 4.5) capture + EchoSight dedicated album + clear-captures UX
 - Vision detector placeholder behind `Detector` protocol
 - Fusion pipeline (2D → 3D) with dev-only FOV calibration
 - Feature 1: scene description (fast template + async Gemma)
@@ -46,7 +46,7 @@ See manifest.md Mermaid graph. Summary: `root → {skeleton, spatial-core} → c
 
 | Spec | Key Decision | Rationale | Affects |
 |------|-------------|-----------|---------|
-| capture | PeekABoo behind `PassthroughCaptureSource` protocol | Lets us swap to `CameraFrameProvider` if Enterprise entitlement granted | detector, fusion |
+| capture | PhotosLibraryCaptureSource (PeekABoo removed in Sprint 4.5) behind `PassthroughCaptureSource` protocol | Lets us swap to `CameraFrameProvider` if Enterprise entitlement granted | detector, fusion |
 | capture | Single capture gesture (no mode disambiguation) | Voice deferred; v0.1 is single-feature (Feature 1 only) | scene-description |
 | detector | Vision placeholder first; Falcon port post-v0.1 | De-risk geometry/UX before 1-week Swift port | scene-description |
 | fusion | Assume pinhole ~100° hFOV; empirical calibration in debug scene | Apple doesn't publish passthrough camera model | scene-description |

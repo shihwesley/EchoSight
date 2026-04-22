@@ -69,3 +69,12 @@ This repository previously hosted a Django + React web-app prototype of EchoSigh
 
 Wesley Shih, Pranathi Mokshagundam, Chaitra Vishweshwaraiah (original web app).
 Wesley Shih (visionOS rewrite).
+
+## Credits
+
+EchoSight's screenshot-based capture mechanism is inspired by
+[PeekABoo](https://github.com/OmChachad/PeekABoo) by Om Chachad -- specifically
+the pattern of observing the Photos library for new screenshots to work around
+the lack of a direct camera API on visionOS. We reimplemented the mechanism
+internally to keep our dependency surface minimal, but the architectural idea
+is theirs.

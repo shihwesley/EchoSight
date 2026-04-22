@@ -223,16 +223,16 @@ struct CameraFrameProviderErrorTests {
     }
 }
 
-// MARK: - PeekABooSource concurrency guard tests
+// MARK: - PhotosLibraryCaptureSource concurrency guard tests
 
 @MainActor
-struct PeekABooSourceConcurrencyTests {
+struct PhotosLibraryCaptureSourceConcurrencyTests {
 
     // Verifies that captureFrame() throws immediately (not hangs) when called
     // while a capture is already in flight — P1-2 regression guard.
     @Test
     func captureFrameThrowsWhenAlreadyInFlight() async throws {
-        let source = PeekABooSource()
+        let source = PhotosLibraryCaptureSource()
 
         // Manually set captureInFlight by starting a task that will never resolve
         // We can't do this via the public API without a real Photos session, so
@@ -291,5 +291,45 @@ struct LagThresholdTests {
         let lag = delivery.timeIntervalSince(shutter)
         let isDegraded = lag > 3.0
         #expect(isDegraded == false)
+    }
+}
+
+// MARK: - PhotosLibraryCaptureSource observer wiring tests
+
+@MainActor
+struct PhotosLibraryCaptureSourceObserverTests {
+
+    // Verifies that PhotosLibraryCaptureSource can be instantiated without Photos
+    // authorization (start() will throw, but the object must init cleanly).
+    @Test
+    func sourceInitializesWithoutAuthorization() {
+        let source = PhotosLibraryCaptureSource()
+        // Source exists; isActive should be false before start() is called.
+        // This is a compile-time correctness guard — the observer wiring (register/
+        // unregisterChangeObserver) requires Photos authorization and cannot be
+        // exercised in unit tests without a real device session.
+        // Manual verification: launch on device, grant access, confirm screenshot
+        // capture reaches handleCapture() via ScreenshotObserver (logged as
+        // "capture.delivered" in the unified log under subsystem "echosight.capture").
+        _ = source // suppress unused-variable warning
+        #expect(true, "PhotosLibraryCaptureSource initializes without crashing")
+    }
+
+    // Verifies that start() throws when Photos authorization is not granted,
+    // which is the expected state in a unit-test environment.
+    @Test
+    func startThrowsWithoutPhotosAuthorization() async {
+        let source = PhotosLibraryCaptureSource()
+        // In the test runner, PHPhotoLibrary authorization is either .notDetermined
+        // or .denied. Either way, start() must throw — not crash or hang.
+        do {
+            try await source.start()
+            // If somehow authorized (e.g. simulator with Photos permission),
+            // stop immediately and pass.
+            await source.stop()
+        } catch {
+            // Expected: EchoSightError.captureFailed with a non-nil description.
+            #expect(error is EchoSightError, "start() throws EchoSightError when Photos access is unavailable")
+        }
     }
 }

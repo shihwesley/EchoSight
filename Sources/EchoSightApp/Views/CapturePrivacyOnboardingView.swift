@@ -1,6 +1,5 @@
 import SwiftUI
 import Photos
-import PeekABoo
 
 // MARK: - CapturePrivacyOnboardingView
 
@@ -107,7 +106,8 @@ struct CapturePrivacyOnboardingView: View {
         Button {
             Task {
                 isRequesting = true
-                let granted = await PeekABoo.requestAccess()
+                let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+                let granted = (status == .authorized)
                 isRequesting = false
                 if granted {
                     onAccessGranted()

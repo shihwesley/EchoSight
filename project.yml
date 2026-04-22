@@ -17,9 +17,6 @@ packages:
   mlx-swift:
     url: https://github.com/ml-explore/mlx-swift.git
     from: 0.21.0
-  PeekABoo:
-    url: https://github.com/OmChachad/PeekABoo.git
-    from: 1.0.0
 
 targets:
   EchoSight:
@@ -54,8 +51,6 @@ targets:
     dependencies:
       - package: swift-log
         product: Logging
-      - package: PeekABoo
-        product: PeekABoo
       - target: EchoSightCore
     settings:
       base:

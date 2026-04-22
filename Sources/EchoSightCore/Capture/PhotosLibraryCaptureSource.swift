@@ -4,27 +4,22 @@ import QuartzCore
 import UIKit
 import Logging
 
-// MARK: - PeekABooSource
+// MARK: - PhotosLibraryCaptureSource
 
-/// `PassthroughCaptureSource` implementation backed by PeekABoo screenshot observation.
+/// `PassthroughCaptureSource` implementation backed by an internal PHPhotoLibraryChangeObserver.
 ///
-/// PeekABoo monitors the system screenshot album and calls back with the captured `UIImage`
+/// Observes the Photos library for new screenshots and calls back with the captured `UIImage`
 /// whenever the user presses Digital Crown + Capture Button.
 ///
-/// The source must be `@MainActor` because PeekABoo's `onCapture` closure runs on the
-/// main actor, and `UIImage` is not `Sendable`.
-///
-/// ## Usage
-///
-/// Attach `.onCapture { image in await source.handleCapture(image) }` to the root view
-/// of your capture-aware SwiftUI hierarchy **exactly once**.
+/// The source must be `@MainActor` because handleCapture is called via a Task hop from the
+/// PhotoKit background queue, and `UIImage` is not `Sendable`.
 ///
 /// ## Lifecycle
 ///
 /// Call `start()` after Photos authorization is granted. Call `stop()` to cancel pending
 /// captures and drain the frame stream.
 @MainActor
-public final class PeekABooSource: PassthroughCaptureSource {
+public final class PhotosLibraryCaptureSource: PassthroughCaptureSource {
 
     // MARK: - Private state
 
@@ -36,6 +31,7 @@ public final class PeekABooSource: PassthroughCaptureSource {
     private var firstCaptureAnnouncedThisSession = false
     /// Prevents two concurrent `captureFrame()` callers from racing on the shared stream.
     private var captureInFlight = false
+    private var screenshotObserver: ScreenshotObserver?
 
     /// 800 ms capture timeout per spec acceptance criterion.
     private let captureTimeoutSeconds: Double = 0.8
@@ -66,6 +62,13 @@ public final class PeekABooSource: PassthroughCaptureSource {
         switch PHPhotoLibrary.authorizationStatus(for: .readWrite) {
         case .authorized:
             _isActive = true
+            let observer = ScreenshotObserver(source: self)
+            screenshotObserver = observer
+            observer.setupFetchResult()
+            // Seed the observer with the current latest screenshot so the first
+            // change notification does not replay a pre-existing screenshot.
+            observer.seed(with: observer.cachedFetchResult?.firstObject?.localIdentifier)
+            PHPhotoLibrary.shared().register(observer)
             logger.info("capture.started")
         case .limited:
             logger.warning("capture.degraded — reason: limitedAccess")
@@ -93,6 +96,10 @@ public final class PeekABooSource: PassthroughCaptureSource {
 
     public func stop() async {
         _isActive = false
+        if let observer = screenshotObserver {
+            PHPhotoLibrary.shared().unregisterChangeObserver(observer)
+            screenshotObserver = nil
+        }
         framesContinuation?.finish()
         logger.info("capture.stopped")
     }
@@ -142,9 +149,9 @@ public final class PeekABooSource: PassthroughCaptureSource {
         }
     }
 
-    // MARK: - Capture handler (called from SwiftUI .onCapture modifier)
+    // MARK: - Capture handler (called by ScreenshotObserver)
 
-    /// Called by the SwiftUI view that hosts the `.onCapture` modifier.
+    /// Called by ScreenshotObserver on the main actor via Task hop.
     ///
     /// Records delivery timestamp immediately on entry, then fetches the
     /// corresponding `PHAsset` to obtain the authoritative shutter timestamp.
@@ -153,7 +160,7 @@ public final class PeekABooSource: PassthroughCaptureSource {
         let deliveryTimestamp = Date()
         logger.info("capture.delivered — at: \(deliveryTimestamp.timeIntervalSince1970)")
 
-        // Guard against zero-size images (PeekABoo swallows errors internally)
+        // Guard against zero-size images
         guard image.size != .zero else {
             logger.warning("capture.failed — reason: zeroSizeImage")
             return
@@ -213,7 +220,7 @@ public final class PeekABooSource: PassthroughCaptureSource {
             // Caller (SwiftUI view) posts the accessibility announcement
             // We signal via notification name so the view layer can react
             NotificationCenter.default.post(
-                name: PeekABooSource.firstCaptureNotification, object: nil
+                name: PhotosLibraryCaptureSource.firstCaptureNotification, object: nil
             )
         }
 
@@ -229,8 +236,8 @@ public final class PeekABooSource: PassthroughCaptureSource {
 
     // MARK: - Authorization
 
-    /// Requests Full Photos access. Returns `false` for `.limited` — PeekABoo
-    /// requires `.authorized` to observe screenshots.
+    /// Requests Full Photos access. Returns `false` for `.limited` —
+    /// Full access required; .limited is insufficient for screenshot monitoring.
     @discardableResult
     public func requestPhotoLibraryAccess() async -> Bool {
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
@@ -255,4 +262,93 @@ public final class PeekABooSource: PassthroughCaptureSource {
     /// Posted after the first capture of a session so the UI layer can announce
     /// the album reminder to VoiceOver.
     public static let firstCaptureNotification = Notification.Name("EchoSight.firstCapture")
+}
+
+// MARK: - ScreenshotObserver
+
+@MainActor
+private final class ScreenshotObserver: NSObject, PHPhotoLibraryChangeObserver {
+    private weak var source: PhotosLibraryCaptureSource?
+    private var lastSeenLocalIdentifier: String?
+    var cachedFetchResult: PHFetchResult<PHAsset>?
+
+    init(source: PhotosLibraryCaptureSource) {
+        self.source = source
+    }
+
+    func seed(with identifier: String?) {
+        lastSeenLocalIdentifier = identifier
+    }
+
+    func setupFetchResult() {
+        let options = PHFetchOptions()
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        options.fetchLimit = 1
+        options.predicate = NSPredicate(
+            format: "(mediaSubtype & %d) != 0", PHAssetMediaSubtype.photoScreenshot.rawValue
+        )
+        cachedFetchResult = PHAsset.fetchAssets(with: .image, options: options)
+    }
+
+    // PHPhotoLibraryChangeObserver is nonisolated — hop to main actor so all
+    // mutation of cachedFetchResult and lastSeenLocalIdentifier stays on the
+    // main actor, avoiding a Swift 6 data race with start() and stop().
+    nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
+        Task { @MainActor in self._photoLibraryDidChange(changeInstance) }
+    }
+
+    private func _photoLibraryDidChange(_ changeInstance: PHChange) {
+        // Fast path: use the cached fetch result to detect insertions only
+        if let current = cachedFetchResult,
+           let details = changeInstance.changeDetails(for: current) {
+            cachedFetchResult = details.fetchResultAfterChanges
+            // Only proceed if something was inserted
+            guard !details.insertedObjects.isEmpty,
+                  let asset = details.fetchResultAfterChanges.firstObject else { return }
+            // Guard against iCloud sync delivering old screenshots as "insertions"
+            let isRecent = asset.creationDate.map { Date().timeIntervalSince($0) < 30 } ?? false
+            guard isRecent else { return }
+            guard asset.localIdentifier != lastSeenLocalIdentifier else { return }
+            lastSeenLocalIdentifier = asset.localIdentifier
+            deliverImage(for: asset)
+            return
+        }
+
+        // Fallback path: cachedFetchResult not yet set; do a direct fetch
+        let options = PHFetchOptions()
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        options.fetchLimit = 1
+        options.predicate = NSPredicate(
+            format: "(mediaSubtype & %d) != 0", PHAssetMediaSubtype.photoScreenshot.rawValue
+        )
+        let result = PHAsset.fetchAssets(with: .image, options: options)
+        cachedFetchResult = result
+        guard let asset = result.firstObject else { return }
+        let isRecent = asset.creationDate.map { Date().timeIntervalSince($0) < 30 } ?? false
+        guard isRecent else { return }
+        guard asset.localIdentifier != lastSeenLocalIdentifier else { return }
+        lastSeenLocalIdentifier = asset.localIdentifier
+        deliverImage(for: asset)
+    }
+
+    private func deliverImage(for asset: PHAsset) {
+        let manager = PHImageManager.default()
+        let requestOptions = PHImageRequestOptions()
+        requestOptions.deliveryMode = .highQualityFormat
+        requestOptions.isSynchronous = false
+        manager.requestImage(
+            for: asset,
+            targetSize: PHImageManagerMaximumSize,
+            contentMode: .default,
+            options: requestOptions
+        ) { [weak self] image, info in
+            if let error = info?[PHImageErrorKey] as? Error {
+                // Non-fatal: log and discard. Common on iCloud-not-downloaded assets.
+                _ = error // logger not available here; parent source logs at handleCapture
+                return
+            }
+            guard let self, let image, let source = self.source else { return }
+            Task { @MainActor in await source.handleCapture(image) }
+        }
+    }
 }

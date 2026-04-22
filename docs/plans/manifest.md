@@ -116,7 +116,7 @@ graph TD
 | spatial-core | specs/spatial-core-spec.md | 1 | 1 | eng-reviewed | 230 | Layer 1 + anchor event stream + head-pose variance |
 | speech-out | specs/speech-out-spec.md | 1 | 1 | tla-verified | 210 | Single AVSpeechSynthesizer owner + priority + ducking (NEW) |
 | observability | specs/observability-spec.md | 1 | 1 | eng-reviewed | 220 | swift-log categories + metrics ring + DebugConsoleView (NEW) |
-| capture | specs/capture-spec.md | 1 | 2 | eng-reviewed | 160 | PeekABoo-backed capture source |
+| capture | specs/capture-spec.md | 1 | 2 | eng-reviewed | 160 | Photos-library-backed capture source |
 | detector | specs/detector-spec.md | 2 | 1 | eng-reviewed | 150 | Vision/YOLO detector behind protocol |
 | fusion | specs/fusion-spec.md | 2 | 1 | eng-reviewed | 200 | 2D->3D + label reconciliation + main-actor raycast |
 | modal-input | specs/modal-input-spec.md | 2 | 2 | completed | 180 | Crown-cycles-modes + Button-fire event bus |
