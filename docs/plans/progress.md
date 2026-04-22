@@ -1,5 +1,21 @@
 # Progress Log
 
+## Session: 2026-04-22 (Sprint 3.1 mid-sprint housekeeping)
+
+### P2-4 + P2-5 resolved
+
+Two highest-risk Sprint 3.1 deferred items picked up before Sprint 3.2 dispatch. Both landed direct-to-main (same pattern as Phase 2 housekeeping commits `3cdeeaa`, `076aa8e`, `69a6143`).
+
+**Commits:**
+- `fd28899` perf(sprint-3.1): fix P2-4 `AnnotationStore` O(N²) write path — split merge-candidate lookup into private `fetchAnnotationsForMerge(worldAnchorId:)` that hits `idx_world_annotations_anchorId` without touching `spatialHash`. Bulk-write cost drops from O(N) hash inserts per write to zero.
+- `38e45dd` test(sprint-3.1): fix P2-5 `GemmaPriorityQueue` state-machine behavioral tests — added `MockGenerator` actor + three tests exercising `.idle → .runningHigh → .idle`, high-preempts-low cancellation, and head-re-enqueue policy under multiple low-priority items. Removes the P2-DEFERRED comment.
+
+**Build verification:** `xcodebuild -scheme EchoSight -destination 'generic/platform=visionOS' build` exits 0, no new warnings.
+
+**Tests:** deferred per project policy (visionOS sim boot exceeds phase-runner watchdog). The three new `GemmaPriorityQueueTests` state-machine tests have deterministic timing (cooperative cancellation + short Task.sleep) and should run reliably when the sim suite is exercised manually.
+
+---
+
 ## Session: 2026-04-22 (Sprint 3.1 execution)
 
 ### Sprint 3.1 — annotation-store + gemma-enrichment (Phase 3 Sprint 1) — merged 81bafd0
@@ -36,12 +52,10 @@
 
 ### Consciously deferred into Phase 3 Sprint 2+ backlog
 
-Carried forward from Sprint 3.1 P2/P3 review:
+Carried forward from Sprint 3.1 P2/P3 review (P2-4 + P2-5 resolved 2026-04-22 housekeeping, see top of log):
 - **P2-1** — `EnrichmentOrchestrator` cancellation log level (preemptions logged as errors)
 - **P2-2** — `AnchorRehydrator` retry-count cap on persistent DB error
 - **P2-3** — `SummarizePromptBuilder` distance calculation (world origin vs head pose)
-- **P2-4** — `AnnotationStore.write` O(N²) load on write path
-- **P2-5** — `GemmaPriorityQueue` preemption + state-machine behavioral tests
 - **P2-6** — `AnnotationStore.load` CQS violation
 - **P3-1** — `QueueError` dead code cleanup
 - **P3-2** — `MeshClassificationSummary` extension location
