@@ -255,7 +255,8 @@ public actor SpatialRecallOrchestrator {
 
         guard !annotations.isEmpty else {
             log.info("recall.state.transition(from:to:)", metadata: ["from": "idle", "to": "idle(empty)"])
-            await speakAction(SpeechUtterance(text: Constants.fallbackSpeechEmpty), .normal)
+            // Token not needed: fallback utterance precedes early return, no cancellation path.
+            _ = await speakAction(SpeechUtterance(text: Constants.fallbackSpeechEmpty), .normal)
             return
         }
 
@@ -345,7 +346,8 @@ public actor SpatialRecallOrchestrator {
         }
 
         let detailText = DescriptionTemplateFormatter.format(candidates: candidates)
-        await speakAction(SpeechUtterance(text: detailText), .normal)
+        // Token not needed: detail utterance is terminal; state transitions to .idle immediately after.
+        _ = await speakAction(SpeechUtterance(text: detailText), .normal)
 
         log.info("recall.pipeline.total", metadata: [
             "path": "detail",
