@@ -119,9 +119,9 @@ graph TD
 | ocr | specs/ocr-spec.md | 2 | 2 | completed | 210 | Read mode via VNRecognizeTextRequest |
 | annotation-store | specs/annotation-store-spec.md | 3 | 1 | eng-reviewed | 250 | Annotations + anchor metadata + rehydrator |
 | gemma-enrichment | specs/gemma-enrichment-spec.md | 3 | 1 | eng-reviewed | 280 | Three-consumer priority queue + preemption cadence |
-| spatial-recall | specs/spatial-recall-spec.md | 3 | 2 | tla-verified | 200 | Recall state machine (owns 2-press timer) |
-| ambient-announce | specs/ambient-announce-spec.md | 3 | 2 | tla-verified | 240 | Passive announce (idle = gesture + head-motion) |
-| onboarding-download | specs/onboarding-download-spec.md | 3 | 2 | eng-reviewed | 190 | 2.6 GB download + non-gating tutorial + diagnostic |
+| spatial-recall | specs/spatial-recall-spec.md | 3 | 2 | completed | 200 | Recall state machine (owns 2-press timer) |
+| ambient-announce | specs/ambient-announce-spec.md | 3 | 2 | completed | 240 | Passive announce (idle = gesture + head-motion) |
+| onboarding-download | specs/onboarding-download-spec.md | 3 | 2 | completed | 190 | 2.6 GB download + non-gating tutorial + diagnostic |
 
 Total specs: **16** (was 14 after CEO, 10 originally). New specs from eng review: speech-out, observability.
 

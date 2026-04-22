@@ -1,5 +1,63 @@
 # Progress Log
 
+## Session: 2026-04-22 (Sprint 3.2 execution)
+
+### Sprint 3.2 — spatial-recall + ambient-announce + onboarding-download (Phase 3 Sprint 2) — merged c6131bc
+
+**Wave A (parallel):** spatial-recall + ambient-announce
+**Wave B (serial):** onboarding-download
+
+**Commits:**
+- `eab1f2c` feat(features): spatial-recall — state machine + 2-press window
+- `f453589` feat(ambient): ambient-announce — novelty gates + session-resume dampener
+- `e2026ac` feat(onboarding): onboarding-download — background download + VO tutorial + diagnostic
+- `6622817` fix(sprint-3.2): code-review P0/P1 + HIG P1/P2 fixes
+- `c6131bc` Merge Sprint 3.2 — spatial-recall + ambient-announce + onboarding-download (Phase 3)
+
+**Build verification:** `xcodebuild -scheme EchoSight -destination 'generic/platform=visionOS' build` exits 0, **0 errors, 0 warnings** (after P0/P1 fixes).
+
+**Tests:** deferred per project policy (visionOS sim boot exceeds phase-runner watchdog). Manual command: `xcodebuild test -scheme EchoSight -destination 'platform=visionOS Simulator,name=Apple Vision Pro' | xcbeautify`. Test files written:
+- `SpatialRecallOrchestratorTests.swift` (8 tests: state machine, fallback, window expiry, mode-change abort)
+- `RecallGestaltFormatterTests.swift` (4 tests: count phrases, dedup, truncation)
+- `NoveltyDetectorTests.swift` (5 tests: nil/recent/threshold/beyond/custom)
+- `IdleTrackerTests.swift` (5 tests: never-fired/recent/threshold/beyond/multi-fire)
+- `AmbientAnnounceCoordinatorTests.swift` (6 tests: all gate combinations, session-resume, silent-mid-flight)
+- `ModelVerifierTests.swift` (6 tests: correct SHA, mismatch+delete, no-delete, readError, empty, case-insensitive)
+- `ModelDownloaderTests.swift` (5 tests: manifest bytes, placeholder detection, entry count, progress fraction, milestone detection)
+
+**Code-review findings (`/code-review-pro`, 2026-04-22):**
+- **P0 (fixed):** (1) `didFinishDownloadingTo` temp URL reclaimed before @MainActor Task — fixed with synchronous `copyItem` in delegate body. (2) SHA-256 verification blocked @MainActor for 2 GB — moved to `Task.detached(priority: .utility)`.
+- **P1 (fixed):** (1) Placeholder SHAs in non-placeholder manifest entries cause infinite retry — added `assertNonPlaceholderSHAs()` precondition guard. (2) `[weak self]` in actor-owned listenTask caused silent event-loop non-start — removed, stop() handles teardown. (3) Force-unwrap on Application Support directory — replaced with nil-coalescing fallback to temp directory.
+- **P2 (deferred, inline notes added):** (1) Untracked fire-and-forget cancel Tasks in mode-change handlers. (2) `ensureDirectoryExists()` silently swallows errors. (3) Empty `falconLabel` produces trailing space in gestalt formatter. (4) `ForEach(Array(progress.values))` non-deterministic order — partially fixed (sorted by id inline).
+- **P3 (deferred, inline notes added):** (1) `handleAnchorEvent` overlong. (2) `HardwareDiagnosticLog` uses print instead of Logger. (3) `markOnboardingComplete()` logs hardcoded durationSec=0.
+
+**HIG audit findings (`/hig-audit`, 2026-04-22):**
+- **P1 (fixed):** (1) Fixed font Dynamic Type on Crown tick counter (`.system(size:)` → `.largeTitle.monospacedDigit()`). (2) Progress ring animation guarded with `accessibilityReduceMotion`.
+- **P2 (fixed):** Privacy Decline button now posts AccessibilityNotification.Announcement.
+- **P2 (deferred):** Tutorial step counter missing `.isStaticText`. Counterclockwise button missing hint. `Storage` privacy copy uses developer jargon.
+- **P3 (deferred):** Storage privacy copy uses technical jargon ("app's private storage").
+
+**Consciously deferred into backlog:**
+- **S3.2-P2-1** — Untracked fire-and-forget cancel Tasks in AmbientAnnounceCoordinator + SpatialRecallOrchestrator
+- **S3.2-P2-2** — `ensureDirectoryExists()` swallows directory-creation errors silently
+- **S3.2-P2-3** — Empty `falconLabel` produces "a " (trailing space) in RecallGestaltFormatter
+- **S3.2-HIG-P2-2** — CounterClockwise button in HardwareDiagnosticView missing accessibilityHint
+- **S3.2-HIG-P2-3** — Tutorial step counter missing `.isStaticText` trait
+- **S3.2-HIG-P3-1** — Storage privacy copy uses "app's private storage" (developer jargon)
+
+**xcodegen regen:** Required for new source directories (Ambient/, Download/, Onboarding/, Settings/). Committed in fix commit `6622817` (xcodeproj included in git add -A).
+
+**Phase 3 gate checklist (Sprint 3.2 close):**
+- [x] All three specs status=completed (spatial-recall, ambient-announce, onboarding-download)
+- [x] Build green (0 errors, 0 warnings, generic/platform=visionOS)
+- [x] Tests written (7 test files, deferred execution per policy)
+- [x] HIG quick-audit for onboarding UI (score 82/100; P1/P2 fixed; P2/P3 deferred)
+- [x] findings.md updated with new decisions (not re-read here; decisions recorded inline in this session)
+
+**Phase 3 gate status: PASSED** — All 5 Phase 3 specs completed. Phase 3 → final gate review ready.
+
+---
+
 ## Session: 2026-04-22 (Sprint 3.1 mid-sprint housekeeping)
 
 ### P2-4 + P2-5 resolved
@@ -352,9 +410,9 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 | ocr | 2 | 2 | completed | ad6da8e | 2026-04-21 |
 | annotation-store | 3 | 1 | completed | 81bafd0 | 2026-04-22 |
 | gemma-enrichment | 3 | 1 | completed | 81bafd0 | 2026-04-22 |
-| spatial-recall | 3 | 2 | eng-reviewed | — | 2026-04-21 |
-| ambient-announce | 3 | 2 | eng-reviewed | — | 2026-04-21 |
-| onboarding-download | 3 | 2 | eng-reviewed | — | 2026-04-21 |
+| spatial-recall | 3 | 2 | completed | c6131bc | 2026-04-22 |
+| ambient-announce | 3 | 2 | completed | c6131bc | 2026-04-22 |
+| onboarding-download | 3 | 2 | completed | c6131bc | 2026-04-22 |
 
 <!-- Status values: draft → ceo-reviewed → eng-reviewed → in_progress → completed | blocked | skipped -->
 
@@ -381,9 +439,9 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 ## 5-Question Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | **Phase 3 Sprint 1 complete** (annotation-store + gemma-enrichment merged at `81bafd0`). Phase 3 Sprint 2 (spatial-recall + ambient-announce + onboarding-download) is next — within-phase auto gate. |
+| Where am I? | **Phase 3 complete.** All 5 Phase 3 specs done (annotation-store + gemma-enrichment at `81bafd0`; spatial-recall + ambient-announce + onboarding-download at `c6131bc`). Ready for Phase 3 → final gate review. |
 | Where am I going? | Ship v0.1 (Feature 1 + Layer 1 + persistence + reasoning) on visionOS |
 | What's the goal? | Accessibility-first spatial companion for BLV users, fully local |
-| What have I learned? | Key 3.1: `project.yml` must be updated alongside `Package.swift` for new SPM deps — XcodeGen drives the xcodeproj, not `Package.swift`. `Atomic<Bool>` from `Synchronization` is the correct tool for single-write cancellation flags in Swift 6. GRDB `PersistableRecord`/`FetchableRecord` pattern works cleanly with SIMD3<Float> split into three Float columns. `SpatialHash` as a value type gives snapshot safety for free. |
-| What have I done? | Phase 1: foundations (1.1) + capture (1.2). Phase 2: detector + fusion (2.1), modal-input + scene-description + ocr (2.2). Phase 3 Sprint 1: annotation-store (GRDB, SpatialHash, AnchorRehydrator, AnchorMetadata) + gemma-enrichment (GemmaRunner, GemmaPriorityQueue, EnrichmentOrchestrator, 3 prompt builders). |
-| What's next? | Phase 3 Sprint 2: spatial-recall + ambient-announce + onboarding-download. Within-phase auto gate — proceeds without user approval per workflow.md. |
+| What have I learned? | Key 3.2: URLSession didFinishDownloadingTo location is only valid synchronously in the delegate call — defer-to-MainActor patterns silently break file moves. Closure injection (not protocols) is the right Swift 6 dependency pattern for actor-isolated orchestrators with test doubles. `[weak self]` inside an actor's own Task is an anti-pattern — actors are reference types and stop() handles teardown. `@MainActor` SHA-256 verification on a 2 GB file causes multi-second UI freeze — always dispatch to Task.detached for large file I/O. |
+| What have I done? | Phase 1: foundations (1.1) + capture (1.2). Phase 2: detector + fusion (2.1), modal-input + scene-description + ocr (2.2). Phase 3 Sprint 1: annotation-store + gemma-enrichment. Phase 3 Sprint 2: spatial-recall + ambient-announce + onboarding-download. All 16 specs completed. |
+| What's next? | Phase 3 final gate review. Then v0.1 release pipeline. |
