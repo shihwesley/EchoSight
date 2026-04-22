@@ -405,3 +405,27 @@ let outcome = await token.completion                               // async
 
 `NSLock`, `DispatchQueue`, and most `final` types from Foundation/Dispatch conform to `Sendable` with internal synchronization. Do not mark these with `nonisolated(unsafe)` — use that modifier only on genuinely non-Sendable mutable static state (e.g., a `static var installed = false` Bool protected by an external lock).
 
+## Phase 4 Execution Findings (2026-04-22)
+
+### Won't-fix items
+
+**Sprint 2.1 P2#2 — VisionDetector timeout rewrite.**
+- Location: `Sources/EchoSightCore/Detector/VisionDetector.swift:detect(in:)`.
+- Original finding (Sprint 2.1 code review): the `DispatchWorkItem` + `NSLock` + `didResume` race-guard pattern for the 2-second timeout should be rewritten with `withThrowingTaskGroup`.
+- Decision: **accept as-is**. Rationale: `handler.perform` (Vision's request dispatch) is synchronous and cannot be interrupted either way. The `withThrowingTaskGroup` rewrite is stylistic only — it produces the same runtime behavior. Deferring until sim test coverage exists to verify race semantics on the ANE path. Inline note remains in `VisionDetector.swift:detect(in:)`.
+- Re-open trigger: device tests running routinely in CI, since the rewrite's benefit is test-time inspectability, not production behavior.
+
+### Execution notes
+
+**`roundedDistance` float-equality fix uses integer buckets.** `DescriptionTemplateFormatter.roundedDistance(_:)` now works in half-metre integer buckets (`Int((clamped / 0.5).rounded())`) instead of comparing rounded Floats with `==`. Keeps the rounding intent, eliminates the float-equality hazard, and the `halfBuckets.isMultiple(of: 2)` check makes the whole-metre vs half-metre branching explicit.
+
+**`[weak self]` removal in actor-owned Tasks (OcrPipeline).** Three instances in `OcrPipeline` used `Task { [weak self] in guard let self else { return } … }` inside an actor — an anti-pattern (actors are reference types, and the Task loop can silently fail to start if the actor deallocates before first suspension). Replaced with direct `self` capture; `stop()` handles cancellation via `currentTask?.cancel()`. Same pattern now consistent with SpeechOut and GemmaPriorityQueue.
+
+**`MeshClassificationSummary.topClasses(_:)` relocated.** Was declared as a module-crossing extension inside `Reasoning/RoomLabelPromptBuilder.swift`. Moved to `Spatial/MeshClassificationSummary.swift` alongside the type it extends. P3-DEFERRED comment removed.
+
+**`AnnotationStore.load` CQS split.** `load()` previously mutated the in-memory cache as a side effect of a named query, violating CQS. Split into a pure `fetch(...)` for reads and a dedicated cache-loading path; existing callers updated.
+
+**`SummarizePromptBuilder` distance now user-relative.** `buildPrompt(from:headPose:)` takes a `SIMD3<Float>` head pose; distances are computed relative to head position rather than world origin. `GemmaRunner.summarize(annotations:headPose:)` defaults `headPose` to `.zero` for back-compat with call sites that have not yet been updated to pass a live head pose.
+
+**Phase-runner partial completion.** The phase-runner agent executing Sprint 4.1 hit Claude usage limits after landing all 5 fix commits but before running `/code-review-pro` on the diff, writing the findings.md won't-fix entry, or updating progress.md. Close-out was completed from the main orchestrator context. `/code-review-pro` on the Sprint 4.1 diff is logged as **S4.1-FOLLOWUP-1** for Sprint 4.3 or pre-release manual invocation.
+

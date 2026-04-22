@@ -16,6 +16,45 @@ Phase 4 added to manifest after user confirmed the backlog-burn-down interpretat
 
 ---
 
+## Session: 2026-04-22 (Sprint 4.1 execution)
+
+### Sprint 4.1 — backlog-codereview (Phase 4 Sprint 1) — merged 144d15b
+
+**Commits (5 fix groups + merge):**
+- `6d9f48a` fix(sprint-1.1): clear P3 deferrals — SAFETY comment + dead state removal
+- `2581717` fix(sprint-2.1): clear P3 deferrals — doc dedup + meaningful test assertions
+- `1ad18ae` fix(sprint-2.2): clear P2 deferrals — quantizer, float eq, weak-self, gesture
+- `40cf4a8` fix(sprint-3.1): clear P2/P3 deferrals — log levels, retry cap, distance, CQS, dead code
+- `9e80f05` fix(sprint-3.2): clear P2/P3 deferrals — cancel tracking, dir errors, logging, timing
+- `144d15b` Merge Sprint 4.1 — backlog-codereview (Phase 4)
+
+**Diff footprint:** 24 files changed, +314/-145. All changes trace to items in `specs/backlog-codereview-spec.md`. Four files outside the spec's Files table were included because the fix landed where the actual offending code lived (`DescriptionTemplateFormatter.swift` — roundedDistance float-eq; `OcrPipeline.swift` — 3 `[weak self]` instances in actor Tasks; `GemmaRunner.swift` — distance parameter propagation; `RoomLabelPromptBuilder.swift` — MeshClassificationSummary extension relocation; `ModelDownloader.swift` — `ensureDirectoryExists` error surface).
+
+**Item resolution:**
+- **23 items resolved** across Sprints 1.1, 2.1 (P3), 2.2, 3.1, 3.2
+- **1 item accepted as won't-fix** — Sprint 2.1 P2#2 VisionDetector timeout rewrite. Rationale logged in `findings.md ## Phase 4 Execution Findings (2026-04-22)`.
+
+**Build verification:** `xcodebuild -scheme EchoSight -destination 'generic/platform=visionOS' build` exits 0. Warning count drift TBD in Sprint 4.2 (Sprint 4.2 is the explicit warning-zero sprint).
+
+**Tests:** deferred per project policy (visionOS sim boot exceeds phase-runner watchdog). New test changes in Sprint 4.1:
+- `Tests/EchoSightCoreTests/TestSupport/Annotations.swift` — shared `makeAnnotation(...)` factory (Sprint 3.1 P3-3)
+- `Tests/EchoSightCoreTests/VisionDetectorTests.swift` — removed tautological `#expect(Bool(true), ...)` assertion, added meaningful behavioral assertions (Sprint 2.1 P3)
+
+**Code-review:** `/code-review-pro` on the Sprint 4.1 diff was **not run** — phase-runner hit Claude usage limits after the fix commits and before reaching the code-review step. Main-context inspection audited the diff before merge (24 files, +314/-145, all traced to spec items; quality judged high, notably the integer-bucket `roundedDistance` rewrite). Full `/code-review-pro` pass deferred as **S4.1-FOLLOWUP-1** — to be run in Sprint 4.3 or manually before release.
+
+**Phase-runner behavior note.** The phase-runner agent produced 5 clean commit groups in spec order before the usage limit fired. Worktree branch `sprint-4.1-backlog-codereview` was in a clean, merge-ready state; close-out (findings.md, progress.md, Spec Status, merge) was completed from the main orchestrator context. No state was lost.
+
+**Phase 4 Sprint 1 → Sprint 2 readiness:**
+- [x] Spec `backlog-codereview` status=completed (`144d15b`)
+- [x] 23/23 P2/P3 items resolved or documented as won't-fix
+- [x] Build green (exit 0)
+- [x] `findings.md` updated with Phase 4 Execution Findings section
+- [ ] `/code-review-pro` — deferred as S4.1-FOLLOWUP-1
+
+Sprint 4.2 (`backlog-hig-warnings`) is unblocked.
+
+---
+
 ## Session: 2026-04-22 (Phase 3 close-out)
 
 ### Phase 3 review gate — ACCEPTED
@@ -456,7 +495,7 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 | spatial-recall | 3 | 2 | completed | c6131bc | 2026-04-22 |
 | ambient-announce | 3 | 2 | completed | c6131bc | 2026-04-22 |
 | onboarding-download | 3 | 2 | completed | c6131bc | 2026-04-22 |
-| backlog-codereview | 4 | 1 | eng-reviewed | — | 2026-04-22 |
+| backlog-codereview | 4 | 1 | completed | 144d15b | 2026-04-22 |
 | backlog-hig-warnings | 4 | 2 | eng-reviewed | — | 2026-04-22 |
 | quality-audits | 4 | 3 | eng-reviewed | — | 2026-04-22 |
 
