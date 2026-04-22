@@ -67,7 +67,7 @@ public actor PipelineMetricsBuffer {
     public func liveStream() -> AsyncStream<PipelineEvent> {
         let id = UUID()
         return AsyncStream { continuation in
-            Task { await self._registerLiveConsumer(continuation, id: id) }
+            Task { self._registerLiveConsumer(continuation, id: id) }
             continuation.onTermination = { [weak self] _ in
                 guard let self else { return }
                 Task { await self._unregisterLiveConsumer(id: id) }

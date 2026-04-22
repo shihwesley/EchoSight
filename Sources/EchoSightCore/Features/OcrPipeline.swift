@@ -94,14 +94,14 @@ public actor OcrPipeline {
         // before the Task's first suspension. Capture self directly; stop() cancels.
         Task {
             for await event in firedEvents where event.mode == .read {
-                await self.handleFire(event: event)
+                self.handleFire(event: event)
             }
         }
 
         // Cancel subscription — abort on any mode change.
         Task {
             for await _ in changeEvents {
-                await self.cancelCurrentPipeline(reason: "mode-change")
+                self.cancelCurrentPipeline(reason: "mode-change")
             }
         }
     }

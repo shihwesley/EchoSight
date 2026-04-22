@@ -75,14 +75,14 @@ public actor SceneDescriptionPipeline {
         // Fire subscription — react to .scene events.
         Task {
             for await event in firedEvents where event.mode == .scene {
-                await self.handleFire(event: event)
+                self.handleFire(event: event)
             }
         }
 
         // Cancel subscription — abort on mode change.
         Task {
             for await _ in changeEvents {
-                await self.cancelCurrentPipeline(reason: "mode-change")
+                self.cancelCurrentPipeline(reason: "mode-change")
             }
         }
     }
