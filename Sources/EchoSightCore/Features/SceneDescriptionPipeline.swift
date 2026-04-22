@@ -148,14 +148,10 @@ public actor SceneDescriptionPipeline {
             "durationMs": "\(Int(Date().timeIntervalSince(detectStart) * 1000))"
         ])
 
-        // 3. Fuse (requires main actor for RealityKit scene)
+        // 3. Fuse
+        // `scene: nil` — FusionEngine falls back to 3 m default distance on nil scene.
+        // v1.0: inject a live RealityKit.Scene for mesh ray-cast (requires main actor hop).
         let fuseStart = Date()
-        let candidates: [AnnotationCandidate] = await MainActor.run {
-            // scene is not available in this context without injection;
-            // pass nil — FusionEngine falls back to 3 m default on nil scene.
-            return []
-        }
-        // Perform actual fusion off main (scene = nil → fusion handles gracefully).
         let fusedCandidates = await fusionEngine.fuse(
             detections: detections,
             frame: frame,

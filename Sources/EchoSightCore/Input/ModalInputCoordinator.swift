@@ -146,10 +146,7 @@ public actor ModalInputCoordinator {
     private func applyMode(_ mode: Mode) {
         currentMode = mode
         defaults.set(mode.rawValue, forKey: Keys.mode)
-        log.info("modal.mode.changed", metadata: [
-            "from": "\(currentMode.rawValue)",
-            "to": "\(mode.rawValue)"
-        ])
+        // Logging of mode.changed is the caller's responsibility (they have the `from` value).
     }
 
     private func speakConfirmation(for mode: Mode) async {
