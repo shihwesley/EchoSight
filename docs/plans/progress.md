@@ -1,5 +1,65 @@
 # Progress Log
 
+## Session: 2026-04-22 (Sprint 4.3 execution)
+
+### Sprint 4.3 — quality-audits (Phase 4 Sprint 3) — merged 36ee359
+
+**Commits (3 audits + 1 fix + 1 findings update + merge):**
+- `d3c53de` — docs(sprint-4.3): audit artifacts — code-review-4.1, test-review, perf-review
+- `9b235d5` — fix(sprint-4.3): recall tests — inject windowDuration to eliminate 6s test wall
+- `8c5a464` — docs(sprint-4.3): findings.md — Phase 4 Post-Audit Backlog + v0.1 release readiness
+- `36ee359` — merge(sprint-4.3): quality-audits — 3 audit artifacts + P0/P1 fixes + findings backlog
+
+**Audit summaries:**
+
+`/code-review-pro` on Sprint 4.1 diff `6d9f48a..9e80f05` (closes S4.1-FOLLOWUP-1):
+- P0: 0 | P1: 0 | P2: 3 | P3: 2
+- Verdict: clean. All 5 fix groups correct. Deferred: handleDirectoryError access level,
+  untracked cleanup Task in AmbientAnnounceCoordinator, failureCounts per-session reset,
+  -1 sentinel duration, Date?? return type.
+
+`/test-review` on 7 Sprint 3.2 test suites, 39 tests (closes S3.2-CLEANUP-2):
+- P0: 1 | P1: 1 | P2: 4 | P3: 2
+- P0 (`secondPressAfterWindowExpiry`): 6-second wall-clock test with race condition.
+- P1 (`windowExpiryDoesNotCancelSpeech`): same root cause.
+- Fix: `SpatialRecallOrchestrator` testability init gains `windowDuration` param (default 5.0 s).
+  Both tests now inject 0.1 s; wall-clock cost drops from ~6 s to ~400 ms each.
+- P2/P3 deferred: gemmaSummarize closure discards annotations, chime count unverified,
+  dual makeAnnotation factories, misleading test name, 2 function-name typos.
+
+`/perf-review` on 6 v0.1 latency budgets (closes S3.2-CLEANUP-3):
+- P0: 0 | P1: 0 | P2: 2 | P3: 1
+- Verdict: clean. All 6 budgets pass symbolic analysis.
+- P0 fixes from Sprint 3.2 verified holding: temp URL reclamation, SHA off @MainActor.
+- Chime ≤200 ms: ~5-15 ms symbolic. Recall gestalt ≤2 s: 410-1610 ms (Gemma-dominated).
+  Recall detail ≤800 ms: ~100-200 ms. Silent-cancel ≤100 ms: fast (AVS .immediate).
+  Scene ≤1.5 s: <400 ms p95. OCR ≤1.5 s: ≤900 ms p95.
+- P2/P3 deferred: no orchestrator-level Gemma timeout, v1.0 @MainActor hop in FusionEngine,
+  cancel-to-silence unmetered.
+
+**Build verification:**
+- `xcodebuild -scheme EchoSight -destination 'generic/platform=visionOS' build` — BUILD SUCCEEDED
+- Warning count (incremental): 0 new warnings introduced. Pre-existing 17 warnings unchanged.
+
+**Deferred items (Phase 4 Post-Audit Backlog):**
+- 17 pre-existing warnings — potential Sprint 4.4 before v0.1
+- 3×P2, 2×P3 from /code-review-pro
+- 4×P2, 2×P3 from /test-review
+- 2×P2, 1×P3 from /perf-review
+- Full catalog in `findings.md ## Phase 4 Post-Audit Backlog (2026-04-22)`
+
+**Spec Status:** `quality-audits | 4 | 3 | completed | 36ee359 | 2026-04-22`
+
+**Phase 4 → v0.1 release readiness:**
+- Phase 4 complete. All 3 housekeeping sprints merged to main.
+- No P0 or P1 items remain open anywhere in the codebase.
+- Remaining blockers for v0.1: 17 warnings (potential Sprint 4.4), deferred P2/P3 backlog,
+  manual device validation session on AVP hardware.
+- Recommended next step: Sprint 4.4 warning cleanup (optional), then device test session,
+  then tag v0.1.
+
+---
+
 ## Session: 2026-04-22 (Phase 4 planning)
 
 ### Phase 4 scope — pre-release housekeeping
