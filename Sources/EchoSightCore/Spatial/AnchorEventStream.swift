@@ -48,7 +48,7 @@ public actor AnchorEventStream {
     public func makeStream() -> AsyncStream<AnchorChangeEvent> {
         let id = UUID()
         return AsyncStream { continuation in
-            Task { await self.register(continuation: continuation, id: id) }
+            Task { self.register(continuation: continuation, id: id) }
             continuation.onTermination = { [weak self] _ in
                 guard let self else { return }
                 Task { await self.unregister(id: id) }

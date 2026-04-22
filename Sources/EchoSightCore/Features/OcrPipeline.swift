@@ -94,14 +94,14 @@ public actor OcrPipeline {
         // before the Task's first suspension. Capture self directly; stop() cancels.
         Task {
             for await event in firedEvents where event.mode == .read {
-                await self.handleFire(event: event)
+                self.handleFire(event: event)
             }
         }
 
         // Cancel subscription — abort on any mode change.
         Task {
             for await _ in changeEvents {
-                await self.cancelCurrentPipeline(reason: "mode-change")
+                self.cancelCurrentPipeline(reason: "mode-change")
             }
         }
     }
@@ -190,27 +190,19 @@ public actor OcrPipeline {
 
             log.info("read.speak.started", metadata: ["chunkIndex": "\(index)"])
             let chunkStart = Date()
-            do {
-                let token = try await speechOut.speak(
-                    SpeechUtterance(text: chunk),
-                    priority: .normal
-                )
-                let outcome = await token.completion
-                log.info("read.speak.chunk.finished", metadata: [
-                    "chunkIndex": "\(index)",
-                    "durationMs": "\(Int(Date().timeIntervalSince(chunkStart) * 1000))",
-                    "outcome": "\(outcome)"
-                ])
-                // If token was cancelled/dropped, abort remaining chunks.
-                if case .cancelled = outcome { return }
-                if case .dropped = outcome { return }
-            } catch {
-                log.warning("read.speak.failed", metadata: [
-                    "chunkIndex": "\(index)",
-                    "error": "\(error)"
-                ])
-                return
-            }
+            let token = await speechOut.speak(
+                SpeechUtterance(text: chunk),
+                priority: .normal
+            )
+            let outcome = await token.completion
+            log.info("read.speak.chunk.finished", metadata: [
+                "chunkIndex": "\(index)",
+                "durationMs": "\(Int(Date().timeIntervalSince(chunkStart) * 1000))",
+                "outcome": "\(outcome)"
+            ])
+            // If token was cancelled/dropped, abort remaining chunks.
+            if case .cancelled = outcome { return }
+            if case .dropped = outcome { return }
         }
 
         log.info("read.pipeline.total", metadata: [
@@ -308,13 +300,9 @@ public actor OcrPipeline {
 
     private func speakFallback() async {
         guard !Task.isCancelled else { return }
-        do {
-            _ = try await speechOut.speak(
-                SpeechUtterance(text: "I don't see any readable text"),
-                priority: .normal
-            )
-        } catch {
-            log.warning("read.fallback.speak.failed", metadata: ["error": "\(error)"])
-        }
+        _ = await speechOut.speak(
+            SpeechUtterance(text: "I don't see any readable text"),
+            priority: .normal
+        )
     }
 }

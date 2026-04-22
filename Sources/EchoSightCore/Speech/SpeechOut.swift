@@ -43,7 +43,7 @@ public actor SpeechOut {
     public func makeStateStream() -> AsyncStream<SpeechState> {
         let id = UUID()
         return AsyncStream { continuation in
-            Task { await self.registerStateContinuation(continuation, id: id) }
+            Task { self.registerStateContinuation(continuation, id: id) }
             continuation.onTermination = { [weak self] _ in
                 guard let self else { return }
                 Task { await self.unregisterStateContinuation(id: id) }
