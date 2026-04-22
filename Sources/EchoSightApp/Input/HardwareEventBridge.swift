@@ -44,19 +44,23 @@ public struct HardwareEventBridgeModifier: ViewModifier {
 
     public func body(content: Content) -> some View {
         content
-            // MARK: Single Tap → Fire Current Mode (Capture Button proxy)
+            // MARK: Tap Gestures — Double-Tap Priority over Single-Tap
+            //
+            // ExclusiveGesture ensures double-tap is fully recognised before single-tap
+            // fires. Without it, a double-tap registers as two singles because both
+            // .gesture() modifiers run in parallel with no priority arbitration.
             .gesture(
-                SpatialTapGesture()
-                    .onEnded { _ in
-                        Task { await coordinator.buttonPressed() }
-                    }
-            )
-            // MARK: Double Tap → Advance Mode (Crown step proxy)
-            .gesture(
-                SpatialTapGesture(count: 2)
-                    .onEnded { _ in
-                        Task { await coordinator.crownRotated(delta: 0.5) }
-                    }
+                ExclusiveGesture(
+                    // Double tap first — higher specificity wins.
+                    SpatialTapGesture(count: 2)
+                        .onEnded { _ in
+                            Task { await coordinator.crownRotated(delta: 0.5) }
+                        },
+                    SpatialTapGesture()
+                        .onEnded { _ in
+                            Task { await coordinator.buttonPressed() }
+                        }
+                )
             )
             // MARK: VoiceOver Rotor Fallback
             // BLV users cycle modes via VoiceOver rotor (two-finger rotation gesture).

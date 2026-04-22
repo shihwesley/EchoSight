@@ -50,12 +50,15 @@ public enum DescriptionTemplateFormatter {
     /// Round distance to nearest 0.5 m, minimum 0.5 m.
     static func roundedDistance(_ raw: Float) -> String {
         let clamped = max(raw, 0.5)
-        let rounded = (clamped / 0.5).rounded() * 0.5
-        if rounded == 1.0 {
+        // Work in half-metre integer buckets to avoid float equality issues.
+        // e.g. 1.0 m → bucket 2 (2 × 0.5); 1.5 m → bucket 3 (3 × 0.5).
+        let halfBuckets = Int((clamped / 0.5).rounded())
+        if halfBuckets == 2 {
             return "1 metre"
         }
-        let formatted = rounded.truncatingRemainder(dividingBy: 1.0) == 0
-            ? "\(Int(rounded)) metres"
+        let rounded = Float(halfBuckets) * 0.5
+        let formatted = halfBuckets.isMultiple(of: 2)
+            ? "\(halfBuckets / 2) metres"
             : "\(String(format: "%.1f", rounded)) metres"
         return formatted
     }

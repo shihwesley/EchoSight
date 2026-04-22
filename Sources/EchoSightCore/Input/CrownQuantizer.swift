@@ -44,7 +44,9 @@ public struct CrownQuantizer: Sendable {
     /// negative = reverse). Zero means the delta was absorbed into the accumulator.
     public mutating func process(delta: Double) -> Int {
         accumulator += delta
-        let steps = Int(accumulator / threshold)
+        // Use floor rather than Int truncation so negative deltas at the sign
+        // boundary emit the correct step. Int(-0.5) = 0; floor(-0.5) = -1.
+        let steps = Int(floor(accumulator / threshold))
         if steps != 0 {
             accumulator -= Double(steps) * threshold
         }

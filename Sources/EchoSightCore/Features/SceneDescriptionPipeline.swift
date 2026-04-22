@@ -63,25 +63,24 @@ public actor SceneDescriptionPipeline {
     /// Subscribe to `ModalInputCoordinator` event streams.
     ///
     /// Call once at startup. Runs two concurrent `Task`s that consume the
-    /// streams for the lifetime of this actor. The tasks hold no strong
-    /// reference cycles: they capture `self` weakly via `unowned` is not
-    /// usable across actors; instead, use isolated `self` — the actor executor
-    /// ensures mutual exclusion.
+    /// streams for the lifetime of this actor. Tasks capture `self` directly —
+    /// actors are reference types and `[weak self]` is an anti-pattern here:
+    /// it can cause the event loop to silently not start if the actor is
+    /// released before the Task's first suspension. `stop()` handles teardown
+    /// via task cancellation.
     public func start(
         firedEvents: AsyncStream<ModeFiredEvent>,
         changeEvents: AsyncStream<ModeChangeEvent>
     ) {
         // Fire subscription — react to .scene events.
-        Task { [weak self] in
-            guard let self else { return }
+        Task {
             for await event in firedEvents where event.mode == .scene {
                 await self.handleFire(event: event)
             }
         }
 
         // Cancel subscription — abort on mode change.
-        Task { [weak self] in
-            guard let self else { return }
+        Task {
             for await _ in changeEvents {
                 await self.cancelCurrentPipeline(reason: "mode-change")
             }
@@ -95,8 +94,7 @@ public actor SceneDescriptionPipeline {
         currentTask?.cancel()
         log.info("scene.fire.received", metadata: ["timestamp": "\(event.timestamp)"])
 
-        currentTask = Task { [weak self] in
-            guard let self else { return }
+        currentTask = Task {
             await self.runPipeline()
         }
     }
