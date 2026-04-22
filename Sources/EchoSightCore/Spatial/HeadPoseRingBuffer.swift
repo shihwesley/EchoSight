@@ -11,6 +11,13 @@ import Foundation
 ///
 /// Not actor-isolated — callers serialize access externally (typically from
 /// `SpatialSession`'s actor context).
+///
+/// # Safety
+/// `@unchecked Sendable` is safe because all mutation occurs exclusively within
+/// `SpatialSession`'s actor isolation. `append` and `orderedSamples` are never
+/// called concurrently — `SpatialSession` serializes writes on its actor executor
+/// and exposes only read-only snapshots to other contexts. No internal lock is
+/// needed because the actor boundary provides the mutual-exclusion guarantee.
 public final class HeadPoseRingBuffer: @unchecked Sendable {
 
     // MARK: - Types
