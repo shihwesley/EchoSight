@@ -1,4 +1,5 @@
 import CoreML
+@preconcurrency import Dispatch
 import Foundation
 import Logging
 import UIKit
