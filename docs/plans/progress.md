@@ -1,5 +1,26 @@
 # Progress Log
 
+## Session: 2026-04-22 (Sprint 4.4 planning)
+
+### Sprint 4.4 — backlog-pre-existing-warnings
+
+Added after Phase 4 completion review. User chose Option B: clear the 17 pre-existing warnings before opening a v0.1 release phase. Rationale: one more mechanical cleanup sprint is cheap insurance — a user-reported crash that turns out to be a pre-existing warning would be expensive to debug during BLV alpha.
+
+**Scope breakdown (17 warnings → 0 after this sprint):**
+- **12 real fixes** in 6 files — 7 "no async operations occur within await" (continuation-registration) + 5 `try/catch` on non-throwing calls. All 7 "no async" instances trace to the Sprint 1.1 close-out's "Sprint 1.2 cleanup candidates" that slipped across Phases 2–3.
+- **4 VisionDetector warnings silenced** via `@preconcurrency import Dispatch` — the compiler's own line-1 suggestion. Preserves the Sprint 2.1 P2#2 won't-fix decision on the underlying `DispatchWorkItem + NSLock + didResume` timeout pattern.
+- **2 `appintentsmetadataprocessor` tool warnings** — outside Swift-compiler scope, filtered out of the gate count.
+
+**Gate for sprint close:** `xcodebuild … build 2>&1 | grep "warning:" | grep -v appintentsmetadataprocessor | wc -l` = 0.
+
+**Review pipeline for Sprint 4.4:** skipped CEO/Eng/TLA (cosmetic-only, no logic changes). Spec marked `eng-reviewed` on authorship.
+
+**Bookkeeping fixup carried in this commit:** Spec Status table rows for `backlog-hig-warnings` and `quality-audits` were left at `eng-reviewed | —` by the 4.2 and 4.3 phase-runner close-outs (the agents updated inline `Spec Status:` references in their session logs but missed the actual table rows). Both rows corrected to `completed` with their merge SHAs.
+
+**Manifest updates:** Phase/Sprint Map +1 row, Spec Files +1 row, total specs 19 → 20.
+
+---
+
 ## Session: 2026-04-22 (Sprint 4.3 execution)
 
 ### Sprint 4.3 — quality-audits (Phase 4 Sprint 3) — merged 36ee359
@@ -601,8 +622,9 @@ Verdict: **REQUEST CHANGES** — 0 P0, 1 P1, 3 P2, 3 P3.
 | ambient-announce | 3 | 2 | completed | c6131bc | 2026-04-22 |
 | onboarding-download | 3 | 2 | completed | c6131bc | 2026-04-22 |
 | backlog-codereview | 4 | 1 | completed | 144d15b | 2026-04-22 |
-| backlog-hig-warnings | 4 | 2 | eng-reviewed | — | 2026-04-22 |
-| quality-audits | 4 | 3 | eng-reviewed | — | 2026-04-22 |
+| backlog-hig-warnings | 4 | 2 | completed | 1b15225 | 2026-04-22 |
+| quality-audits | 4 | 3 | completed | 36ee359 | 2026-04-22 |
+| backlog-pre-existing-warnings | 4 | 4 | eng-reviewed | — | 2026-04-22 |
 
 <!-- Status values: draft → ceo-reviewed → eng-reviewed → in_progress → completed | blocked | skipped -->
 

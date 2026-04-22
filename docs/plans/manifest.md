@@ -104,6 +104,7 @@ graph TD
 | 4 | 1 | backlog-codereview | no (single consolidation spec) |
 | 4 | 2 | backlog-hig-warnings | no (single consolidation spec) |
 | 4 | 3 | quality-audits | no (single consolidation spec) |
+| 4 | 4 | backlog-pre-existing-warnings | no (single consolidation spec) |
 
 ## Spec Files
 
@@ -128,8 +129,9 @@ graph TD
 | backlog-codereview | specs/backlog-codereview-spec.md | 4 | 1 | completed | 150 | Phase 1–3 P2/P3 code-review backlog cleanup (23 items) |
 | backlog-hig-warnings | specs/backlog-hig-warnings-spec.md | 4 | 2 | completed | 110 | HIG P2/P3 deferrals + Sprint 3.2 build-warning cleanup |
 | quality-audits | specs/quality-audits-spec.md | 4 | 3 | completed | 120 | /test-review + /perf-review + P0/P1 audit fixes |
+| backlog-pre-existing-warnings | specs/backlog-pre-existing-warnings-spec.md | 4 | 4 | eng-reviewed | 110 | Clear 17 pre-existing warnings (Sprint 4.2 surfaced) + silence VisionDetector won't-fix noise |
 
-Total specs: **19** (16 feature specs across Phases 1–3 + 3 housekeeping specs in Phase 4). New specs from eng review: speech-out, observability. New specs from Phase 4 planning (2026-04-22): backlog-codereview, backlog-hig-warnings, quality-audits.
+Total specs: **20** (16 feature specs across Phases 1–3 + 4 housekeeping specs in Phase 4). New specs from eng review: speech-out, observability. New specs from Phase 4 planning (2026-04-22): backlog-codereview, backlog-hig-warnings, quality-audits, backlog-pre-existing-warnings.
 
 ## Success Criteria (v0.1)
 
