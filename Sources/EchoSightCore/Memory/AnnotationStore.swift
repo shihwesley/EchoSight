@@ -102,7 +102,10 @@ public actor AnnotationStore {
     /// - Returns: The stored annotation (either merged or newly inserted).
     @discardableResult
     public func write(annotation: WorldAnnotation, mergeRadius: Float = 0.30) throws -> WorldAnnotation {
-        // Check for existing annotation to merge
+        // Check for existing annotation to merge.
+        // P2-DEFERRED(Sprint 3.x): load() does a full DB read + spatial hash re-index on every
+        // write call (O(N²) under bulk ingestion). Replace with a private fetchAnnotationsForMerge()
+        // that reads from DB only without touching spatialHash.
         let existingForAnchor = try load(worldAnchorId: annotation.worldAnchorId)
         let result: WorldAnnotation
 
@@ -160,6 +163,10 @@ public actor AnnotationStore {
     ///
     /// Also inserts any loaded annotations into the in-memory spatial hash
     /// (used by `AnchorRehydrator` on `.rerecognized` events).
+    ///
+    /// P2-DEFERRED(Sprint 3.x): CQS violation — a method named `load` that also mutates
+    /// `spatialHash` is surprising at call sites. Split into `load` (pure read) and
+    /// `rehydrate` (read + hash update), with only `AnchorRehydrator` calling `rehydrate`.
     public func load(worldAnchorId: UUID) throws -> [WorldAnnotation] {
         let records = try dbQueue.read { db in
             try WorldAnnotationRecord.filter(
@@ -330,12 +337,27 @@ public actor AnnotationStore {
 
     /// Returns `true` if this anchor UUID has a row in `anchor_metadata`.
     /// Used by `AnchorEventStream.anchorMetadataQuery` to discriminate `.new` from `.rerecognized`.
+    ///
+    /// Non-throwing by contract (the caller is a synchronous closure injected into `AnchorEventStream`).
+    /// On DB error, logs the failure and defaults to `false` — the error case causes `.new` to fire
+    /// instead of `.rerecognized`, which is the safer fallback (no data loss, just a redundant announce).
     public func hasAnchorMetadata(anchorId: UUID) -> Bool {
-        (try? dbQueue.read { db in
-            try AnchorMetadataRecord.filter(
-                Column("anchorId") == anchorId.uuidString
-            ).fetchCount(db) > 0
-        }) ?? false
+        do {
+            return try dbQueue.read { db in
+                try AnchorMetadataRecord.filter(
+                    Column("anchorId") == anchorId.uuidString
+                ).fetchCount(db) > 0
+            }
+        } catch {
+            log.error(
+                "store.query.anchorMetadata.error",
+                metadata: [
+                    "anchorId": .string(PrivacyFilter.hashAnchorId(anchorId)),
+                    "error": .string("\(error)"),
+                ]
+            )
+            return false
+        }
     }
 
     // MARK: - Private Helpers

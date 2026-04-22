@@ -57,7 +57,7 @@ struct AnchorMetadataTests {
     }
 
     @Test("UPSERT on same anchor updates lastSeenAt")
-    func upsertUpdatesLastSeenAt() throws {
+    func upsertUpdatesLastSeenAt() async throws {
         let store = try makeStore()
         let anchorId = UUID()
 

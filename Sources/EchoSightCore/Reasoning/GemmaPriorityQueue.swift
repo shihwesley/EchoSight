@@ -31,6 +31,8 @@ public actor GemmaPriorityQueue {
         case low
     }
 
+    // P3-DEFERRED: QueueError is currently dead code — errors propagate from the generate
+    // closure directly. Remove or make internal when consumers actually catch specific cases.
     public enum QueueError: Error, Sendable {
         case cancelled
         case modelUnavailable

@@ -81,6 +81,10 @@ public actor AnchorRehydrator {
                 ]
             )
         } catch {
+            // P2-DEFERRED(Sprint 3.x): failed rehydration should not permanently block retry.
+            // Currently isRehydrated() stays false (never inserted), so the next .rerecognized
+            // event will re-attempt — which is correct behaviour. The note here is to add an
+            // explicit retry-count cap to avoid infinite rehydration storms on persistent DB errors.
             log.error(
                 "store.rehydrate.failed",
                 metadata: [

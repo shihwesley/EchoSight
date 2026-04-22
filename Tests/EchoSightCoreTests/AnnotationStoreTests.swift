@@ -5,6 +5,11 @@ import simd
 
 // MARK: - AnnotationStoreTests
 
+// P3-DEFERRED: makeAnnotation() helper is duplicated across AnnotationStoreTests,
+// AnnotationMergerTests, SpatialHashTests, SummarizePromptBuilderTests, and
+// RoomLabelPromptBuilderTests. Extract to a shared WorldAnnotationFactory.swift
+// in the test target to eliminate duplication.
+
 /// Tests for CRUD operations, SQLite round-trip, and anchor-metadata API.
 /// Uses in-memory database (nil path) so no filesystem state leaks between tests.
 @Suite("AnnotationStore")

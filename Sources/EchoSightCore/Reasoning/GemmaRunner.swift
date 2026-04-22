@@ -1,6 +1,7 @@
 import Foundation
 import simd
 import Logging
+import Synchronization
 
 // MARK: - GemmaRunner
 
@@ -143,18 +144,18 @@ public actor GemmaRunner {
 
 // MARK: - CancelFlag
 
-/// Thread-safe single-write boolean for cooperative cancellation.
+/// Thread-safe cancellation flag for cooperative generation loop.
 ///
-/// Used by `GemmaRunner`'s generate closure to communicate task cancellation
-/// to `GemmaModelManager.generate`'s cooperative polling loop.
-/// Class reference shared between the `onCancel` handler and the closure body.
-private final class CancelFlag: @unchecked Sendable {
-    // nonisolated(unsafe): written once from onCancel, read-only inside the model loop.
-    // The write happens-before any read because onCancel fires before the closure resumes.
-    nonisolated(unsafe) private var _cancelled = false
+/// Uses `Atomic<Bool>` (Swift 6 Synchronization) so the `onCancel` handler
+/// and the generate polling loop can share the flag across threads without
+/// a data race. Relaxed ordering is sufficient: the only invariant is that
+/// eventually the poller sees `true` after `cancel()` is called — correctness
+/// does not depend on seeing it immediately.
+private final class CancelFlag: Sendable {
+    private let _cancelled = Atomic<Bool>(false)
 
-    func cancel() { _cancelled = true }
-    var isCancelled: Bool { _cancelled }
+    func cancel() { _cancelled.store(true, ordering: .relaxed) }
+    var isCancelled: Bool { _cancelled.load(ordering: .relaxed) }
 }
 
 // MARK: - EnrichmentContext

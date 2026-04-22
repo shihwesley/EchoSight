@@ -4,6 +4,11 @@ import Foundation
 
 // MARK: - GemmaPriorityQueueTests
 
+// P2-DEFERRED(Sprint 3.x): preemption, re-enqueue-at-head, and state-machine behavior need
+// behavioral tests with a mock generate closure. GemmaPriorityQueue.init(generate:) is
+// internal and directly injectable — add tests for: high-while-idle, high-while-low-running,
+// and two simultaneous high calls.
+
 /// Tests for priority scheduling, preemption, and re-enqueue semantics.
 /// Uses a mock GemmaRunner that responds instantly so tests are deterministic.
 @Suite("GemmaPriorityQueue")

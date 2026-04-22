@@ -116,6 +116,8 @@ public actor EnrichmentOrchestrator {
                 ]
             )
         } catch {
+            // P2-DEFERRED(Sprint 3.x): distinguish CancellationError (normal preemption) from
+            // real failures — preemptions should log at .debug, not .error.
             log.error(
                 "gemma.enrichment.failed",
                 metadata: [

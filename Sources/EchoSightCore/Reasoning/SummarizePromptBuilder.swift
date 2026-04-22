@@ -23,8 +23,9 @@ public enum SummarizePromptBuilder {
         }
 
         let items = annotations.prefix(8).map { annotation -> String in
-            // Distance from origin — caller provides world-space positions;
-            // spatial-recall will call this with annotations near head pose.
+            // P2-DEFERRED(Sprint 3.x): distance is from world origin (0,0,0), not head pose.
+            // Fix: add headPose: SIMD3<Float> parameter to buildPrompt and use
+            // simd_distance(annotation.worldPosition, headPose). Spatial-recall must thread it in.
             let dist = simd_length(annotation.worldPosition)
             let direction = cardinalDirection(from: annotation.worldPosition)
             return "\(annotation.falconLabel) \(String(format: "%.1f", dist))m \(direction)"
