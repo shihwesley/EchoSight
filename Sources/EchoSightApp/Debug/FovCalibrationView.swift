@@ -66,21 +66,19 @@ struct FovCalibrationView: View {
             Divider()
 
             // Computed ray for center pixel
-            let centerRayX = PixelToRay.ray(nx: 0.5, ny: 0.5, hFovDeg: Float(hFov), aspect: Float(aspect)).x
-            let centerRayY = PixelToRay.ray(nx: 0.5, ny: 0.5, hFovDeg: Float(hFov), aspect: Float(aspect)).y
-            let centerRayZ = PixelToRay.ray(nx: 0.5, ny: 0.5, hFovDeg: Float(hFov), aspect: Float(aspect)).z
+            let centerRay = PixelToRay.ray(nx: 0.5, ny: 0.5, hFovDeg: Float(hFov), aspect: Float(aspect))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Center ray (head-local):")
                     .font(.caption)
                     .bold()
-                Text("x: \(centerRayX, format: .number.precision(.fractionLength(4)))")
+                Text("x: \(centerRay.x, format: .number.precision(.fractionLength(4)))")
                     .monospacedDigit()
                     .font(.caption)
-                Text("y: \(centerRayY, format: .number.precision(.fractionLength(4)))")
+                Text("y: \(centerRay.y, format: .number.precision(.fractionLength(4)))")
                     .monospacedDigit()
                     .font(.caption)
-                Text("z: \(centerRayZ, format: .number.precision(.fractionLength(4)))")
+                Text("z: \(centerRay.z, format: .number.precision(.fractionLength(4)))")
                     .monospacedDigit()
                     .font(.caption)
             }

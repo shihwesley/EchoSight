@@ -2,7 +2,7 @@ import CoreML
 import Foundation
 import Logging
 import UIKit
-import Vision
+@preconcurrency import Vision
 
 // MARK: - VisionDetector
 
@@ -24,6 +24,12 @@ public actor VisionDetector: Detector {
     // MARK: - Private state
 
     private let logger = Logger(label: LogCategories.detector)
+    /// Serial queue shared by `detect(in:)` and `warmUpInference()`. Owned by the
+    /// actor so we don't allocate a fresh queue per call (Sprint 2.1 P2 #1 fix).
+    private let inferenceQueue = DispatchQueue(
+        label: "echosight.detector.inference",
+        qos: .userInitiated
+    )
     private var mlModel: MLModel?
     private var vnModel: VNCoreMLModel?
     private var _isWarm = false
@@ -110,10 +116,13 @@ public actor VisionDetector: Detector {
         logger.info("detector.detect.started — frameId: \(frameId)")
         let start = Date()
 
-        // Run inference synchronously on a background queue.
+        // Run inference synchronously on the actor-owned background queue.
         // withCheckedThrowingContinuation suspends the actor until the queue fires.
         // The 2-second budget is enforced by a DispatchWorkItem deadline.
-        let inferenceQueue = DispatchQueue(label: "echosight.detector.inference", qos: .userInitiated)
+        // Note: P2 — this timeout pattern cannot interrupt a running Vision
+        // inference (`handler.perform` is synchronous). A `withThrowingTaskGroup`
+        // rewrite would be stylistically cleaner but carries the same limitation,
+        // so the refactor is deferred until sim test coverage is available.
         let results: [DetectionResult]
 
         do {
@@ -215,12 +224,11 @@ public actor VisionDetector: Detector {
     }
 
     /// Warm up the ANE by running a dummy inference on a 1×1 black image.
-    /// Uses the same DispatchQueue path as detect() to keep VNCoreMLModel on the actor heap.
+    /// Uses the actor-owned `inferenceQueue` to keep VNCoreMLModel on the actor heap.
     private func warmUpInference() async {
         guard let vnModel else { return }
         let dummyImage = Self.makeBlackImage(size: CGSize(width: 1, height: 1))
         guard let cgImage = dummyImage.cgImage else { return }
-        let inferenceQueue = DispatchQueue(label: "echosight.detector.warmup", qos: .background)
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             inferenceQueue.async {
                 let request = VNCoreMLRequest(model: vnModel)
