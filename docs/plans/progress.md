@@ -16,6 +16,51 @@ Phase 4 added to manifest after user confirmed the backlog-burn-down interpretat
 
 ---
 
+## Session: 2026-04-22 (Sprint 4.2 execution)
+
+### Sprint 4.2 — backlog-hig-warnings (Phase 4 Sprint 2) — merged 1b15225
+
+**Commits (2 fix groups + merge):**
+- `393d034` — fix(sprint-4.2): build-warning cleanup (S3.2-CLEANUP-1)
+- `d7bbe7d` — fix(sprint-4.2): HIG accessibility deferrals (S3.2-HIG-P2-2, P2-3, P3-1)
+- `1b15225` — merge(sprint-4.2): backlog-hig-warnings — build warnings + HIG deferrals
+
+**Diff footprint:** 6 files changed, +138/-7. All changes trace to items in `specs/backlog-hig-warnings-spec.md`.
+
+**Build-warning resolution (S3.2-CLEANUP-1):**
+- Baseline (14bdb08 clean build): 20 unique warnings (measured via `xcodebuild … 2>&1 | grep "warning:" | grep -v appintentsmetadataprocessor | sort -u | wc -l`)
+- After sprint-4.2 (1b15225 clean build): 17 unique warnings
+- **3 S3.2-CLEANUP-1 warnings eliminated:** ChimeRenderer.swift:67, SpatialRecallOrchestrator.swift:258, SpatialRecallOrchestrator.swift:348
+- **17 pre-existing warnings remain** (out of scope for this sprint): VisionDetector.swift (4 Sendable/DispatchWorkItem — accepted won't-fix Sprint 2.1), OcrPipeline.swift (5 redundant try/await), SceneDescriptionPipeline.swift (2), ModalInputCoordinator.swift (2), PipelineMetricsBuffer.swift (1), AnchorEventStream.swift (1), SpeechOut.swift (1), appintentsmetadataprocessor (2 tool warnings, not Swift compiler). None from files touched in this sprint.
+
+**HIG deferral resolution:**
+- S3.2-HIG-P2-3: `.accessibilityAddTraits(.isStaticText)` on ModeTutorialView step counter
+- S3.2-HIG-P2-2: `.accessibilityHint` on counterclockwise Crown button (HardwareDiagnosticView), matching clockwise button pattern
+- S3.2-HIG-P3-1: Storage privacy copy rewritten — "app's private storage" → "stay on your Vision Pro and are removed when you delete EchoSight"
+
+**HIG re-audit:** `/hig-audit` score 91/100 (Sprint 3.2 baseline: 82/100). Gate: PASS. Artifact: `.orchestrate/hig-audit-phase4.md`. No new P0/P1 findings.
+
+**Code review:** `/code-review-pro` on Sprint 4.2 diff: P0: 0, P1: 0, P2: 0, P3: 1. P3-1: `await scheduleBuffer` introduces a sub-millisecond actor suspension point where previously there was none; risk is cosmetic given upstream 2-second chime gate. Fixed by updating the doc comment to document suspension semantics. No code change required.
+
+**Build verification:** `xcodebuild -scheme EchoSight -destination 'generic/platform=visionOS' clean build` — BUILD SUCCEEDED, 0 errors.
+
+**Tests:** Deferred per project policy (visionOS sim boot exceeds phase-runner watchdog). No new test files in this sprint.
+
+**Deferred items (not Sprint 4.2 scope):**
+- 17 pre-existing warnings from VisionDetector, OcrPipeline, etc. — to be audited in Sprint 4.3 or later
+- S4.1-FOLLOWUP-1 (full `/code-review-pro` pass on Sprint 4.1 diff) — Sprint 4.3
+- P3-1 hint verbosity on counterclockwise button — cosmetic, acceptable
+
+**Spec Status:** `backlog-hig-warnings | 4 | 2 | completed | 1b15225 | 2026-04-22`
+
+**Phase 4 Sprint 2 → Sprint 3 readiness:**
+- Build is warning-clean for all S3.2-CLEANUP-1 items ✓
+- HIG audit score 91/100 ✓
+- All 3 HIG P2/P3 deferrals resolved ✓
+- Sprint 4.3 (`quality-audits`) can begin from clean state
+
+---
+
 ## Session: 2026-04-22 (Sprint 4.1 execution)
 
 ### Sprint 4.1 — backlog-codereview (Phase 4 Sprint 1) — merged 144d15b
