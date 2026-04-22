@@ -102,11 +102,9 @@ public actor AnnotationStore {
     /// - Returns: The stored annotation (either merged or newly inserted).
     @discardableResult
     public func write(annotation: WorldAnnotation, mergeRadius: Float = 0.30) throws -> WorldAnnotation {
-        // Check for existing annotation to merge.
-        // P2-DEFERRED(Sprint 3.x): load() does a full DB read + spatial hash re-index on every
-        // write call (O(N²) under bulk ingestion). Replace with a private fetchAnnotationsForMerge()
-        // that reads from DB only without touching spatialHash.
-        let existingForAnchor = try load(worldAnchorId: annotation.worldAnchorId)
+        // Merge check hits the `idx_world_annotations_anchorId` index only; spatial hash
+        // is updated downstream on the stored annotation alone, not rebuilt for every sibling.
+        let existingForAnchor = try fetchAnnotationsForMerge(worldAnchorId: annotation.worldAnchorId)
         let result: WorldAnnotation
 
         if let existing = AnnotationMerger.findMergeCandidate(
@@ -370,6 +368,18 @@ public actor AnnotationStore {
                 arguments: [anchorId.uuidString]
             )
         }
+    }
+
+    /// Reads annotations for an anchor without mutating `spatialHash`.
+    /// Used by `write()` on the merge-candidate lookup path to keep bulk ingestion O(N)
+    /// instead of O(N²) from redundant hash re-indexing.
+    private func fetchAnnotationsForMerge(worldAnchorId: UUID) throws -> [WorldAnnotation] {
+        let records = try dbQueue.read { db in
+            try WorldAnnotationRecord.filter(
+                Column("worldAnchorId") == worldAnchorId.uuidString
+            ).fetchAll(db)
+        }
+        return records.compactMap { $0.toAnnotation() }
     }
 
     private func rebuildSpatialHash() throws {
